@@ -52,7 +52,7 @@ async def on_wavelink_node_ready(node: wavelink.Node):
 
 async def node_connect():
     await bot.wait_until_ready()
-    await wavelink.NodePool.create_node(bot=bot, host='jp-lava.islantay.tk', port=443, password='AmeliaWatsonisTheBest**!', https=True, spotify_client=spotify.SpotifyClient(client_id='c1462741728249aea258de6de0840b0f', client_secret='c0af18abf68f4067967125bd7f7a2031'))
+    await wavelink.NodePool.create_node(bot=bot, host='jp-lava.islantay.tk', port=443, password='AmeliaWatsonisTheBest**!', https=True)
 
 @bot.event
 async def on_command_error(ctx: commands.Context, error):
