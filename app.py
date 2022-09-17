@@ -45,6 +45,7 @@ async def user_connectivity(ctx: commands.Context):
 async def on_ready():
     print(f'logged in as: {bot.user.name}')
     bot.loop.create_task(node_connect())
+    await bot.change_presence(activity=nextcord.Activity(type=nextcord.ActivityType.listening, name=",help"))
 
 @bot.event
 async def on_wavelink_node_ready(node: wavelink.Node):
