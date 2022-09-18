@@ -53,7 +53,7 @@ async def on_wavelink_node_ready(node: wavelink.Node):
 
 async def node_connect():
     await bot.wait_until_ready()
-    await wavelink.NodePool.create_node(bot=bot, host='jp-lava.islantay.tk', port=443, password='AmeliaWatsonisTheBest**!', https=True)
+    await wavelink.NodePool.create_node(bot=bot, host='lavalink.botsuniversity.ml', port=443, password='mathiscool', https=True)
 
 @bot.event
 async def on_command_error(ctx: commands.Context, error):
@@ -400,6 +400,5 @@ async def seek_command(ctx: commands.Context, seekPosition: int):
 '''main'''
 
 if __name__ == '__main__':
-    bot.run(os.environ['tishmish_token'])
-
-
+    # bot.run(os.environ['tishmish_token'])
+    bot.run('MTAwNzY1MzIwMzcxMTYzOTU2Mg.G52shf.q4R9FnxVmMpHs1faGCTBK8T2iuMpsLmGVx3xIU')
