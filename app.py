@@ -400,5 +400,4 @@ async def seek_command(ctx: commands.Context, seekPosition: int):
 '''main'''
 
 if __name__ == '__main__':
-    # bot.run(os.environ['tishmish_token'])
-    bot.run('MTAwNzY1MzIwMzcxMTYzOTU2Mg.G52shf.q4R9FnxVmMpHs1faGCTBK8T2iuMpsLmGVx3xIU')
+    bot.run(os.environ['tishmish_token'])
