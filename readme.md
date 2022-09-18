@@ -5,4 +5,4 @@
 - spotify support comming soon
 - enjoy 
 
-bot link: https://discord.com/api/oauth2/authorize?client_id=1007653203711639562&permissions=8&scope=bot
+[bot link](https://discord.com/api/oauth2/authorize?client_id=1007653203711639562&permissions=8&scope=bot)
