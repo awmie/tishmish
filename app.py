@@ -53,7 +53,7 @@ async def on_wavelink_node_ready(node: wavelink.Node):
 
 async def node_connect():
     await bot.wait_until_ready()
-    await wavelink.NodePool.create_node(bot=bot, host='lavalink4.botsuniversity.ml', port=443, password='mathiscool', https=True)
+    await wavelink.NodePool.create_node(bot=bot, host='lavalink.botsuniversity.ml', port=443, password='mathiscool', https=True)
 
 @bot.event
 async def on_command_error(ctx: commands.Context, error):
