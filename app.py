@@ -244,7 +244,7 @@ async def nowplaying_command(ctx: commands.Context):
         return await ctx.send(embed=em)
 
 @commands.cooldown(1, 2, commands.BucketType.user)  
-@bot.command(name='loop', help='loops the current song')
+@bot.command(name='loop', help='•loops the current song\n•unloops the current song')
 async def loop_command(ctx: commands.Context):
     if await user_connectivity(ctx) == False:
         return
