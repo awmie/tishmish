@@ -1,4 +1,4 @@
-
+# T I S H M I S H 
 import datetime, random
 import nextcord
 from nextcord.ext import commands
@@ -91,23 +91,23 @@ async def info_command(ctx: commands.Context):
     await ctx.send(embed=nextcord.Embed(description=f'**Info**\ntotal server count: `{len(bot.guilds)}`', color=embed_color))
     
 @commands.cooldown(1, 2, commands.BucketType.user)        
-@bot.command(name='loopqueue', aliases=['lq'], help='loops the existing queue')
+@bot.command(name='loopqueue', aliases=['lq'], help='**,lq start**\t**,lq enable**\n`starts the loopqueue`\n\n**,lq stop**\t**,lq disable**\n`stops the loopqueue`')
 async def loopqueue_command(ctx: commands.Context, type:str):
     vc: wavelink.Player = ctx.voice_client
     if not vc.queue.is_empty:
         
-        if type == 'start':
+        if type == 'start' or type == 'enable':
             vc.lq = True
-        if type == 'stop' and vc.lq is True:
-            vc.lq = False
-        
-        if type != 'start' and type != 'stop':
-            return await ctx.send(embed=nextcord.Embed(description='Use:\n**,lq start**---> `starts the loopqueue`\n**,lq stop**---> `stops the loopqueue`', color=embed_color))
-
-        if vc.lq is True:
             return await ctx.send(embed=nextcord.Embed(description='**loopqueue**: `enabled`', color=embed_color))
-        elif vc.lq is False:
-            return await ctx.send(embed=nextcord.Embed(description='**loopqueue**: `disabled`', color=embed_color))
+        if type == 'stop' or type == 'disable' and vc.lq is True:
+            vc.lq = False
+            await ctx.send(embed=nextcord.Embed(description='**loopqueue**: `disabled`', color=embed_color))
+            if song_count == 1 and vc.queue._queue[0] == vc._source:
+                del vc.queue._queue[0]
+            else:
+                return ''                
+        if type != 'start' and type != 'enable' and type != 'disable' and type != 'stop':
+            return await ctx.send(embed=nextcord.Embed(description='check **,help** for **loopqueue** or **lq**', color=embed_color))
     else:
         return await ctx.send(embed=nextcord.Embed(description='No songs are addded to the `QUEUE`', color=embed_color))
 
@@ -184,7 +184,11 @@ async def skip_command(ctx: commands.Context):
         vc: wavelink.Player = ctx.voice_client
 
         if vc.loop == True:
-            return await ctx.send(embed=nextcord.Embed(description=f'Disable the `LOOP` to skip', color=embed_color))
+            vclooptxt = ''
+            vclooptxt+=('Disable the `LOOP` to skip\n')
+            vclooptxt+=('  • **,loop** again to disable the `LOOP` or\n')
+            vclooptxt+=('  • Add a new song to disable the `LOOP`\n')
+            return await ctx.send(embed=nextcord.Embed(description=vclooptxt, color=embed_color))
 
         elif vc.queue.is_empty:
             await vc.stop()
@@ -257,9 +261,9 @@ async def loop_command(ctx: commands.Context):
             setattr(vc, 'loop', False)
         
         if vc.loop:
-            return await ctx.send(embed= nextcord.Embed(description='LOOP:`enabled`', color=embed_color))
+            return await ctx.send(embed= nextcord.Embed(description='**LOOP**: `enabled`', color=embed_color))
         else:
-            return await ctx.send(embed=nextcord.Embed(description='LOOP:`disabled`', color=embed_color))
+            return await ctx.send(embed=nextcord.Embed(description='**LOOP**: `disabled`', color=embed_color))
 
 @commands.cooldown(1, 2, commands.BucketType.user)  
 @bot.command(name='queue', aliases=['q', 'track'], help='displays the current queue')
@@ -274,7 +278,7 @@ async def queue_command(ctx: commands.Context):
         
         lqstr = '`disabled`' if vc.lq == False else '`enabled`'
         
-        em = nextcord.Embed(description=f'**QUEUE**\n\nloopqueue: *{lqstr}*',color=embed_color)
+        em = nextcord.Embed(description=f'**QUEUE**\n\n**loopqueue**: {lqstr}',color=embed_color)
         global song_count, song, song_queue
         song_queue = vc.queue.copy()
         song_count = 0
@@ -404,4 +408,5 @@ async def seek_command(ctx: commands.Context, seekPosition: int):
 '''main'''
 
 if __name__ == '__main__':
-    bot.run(os.environ['tishmish_token'])
+    # bot.run(os.environ['tishmish_token'])
+    bot.run('MTAwNzY1MzIwMzcxMTYzOTU2Mg.G-osY-.2whN-m7u3d_9EQXwZtDl0VUewBmFNDqAZQDxy4')
