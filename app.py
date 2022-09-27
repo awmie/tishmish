@@ -46,8 +46,8 @@ async def help(ctx, helpstr: Optional[str]):
             tm += f'`,{i.name}`' + ' '
         for j in member_cmds:
             mm += f'`,{j.name}`' + ' '
-        help_description = f'''**member commands**\n{mm}\n\n**tm commands**\n{tm}\n\n\n**To use tm-commands, server owner/admin can provide `tm` role to the member**\n
-        **Admin/Owner:**\nTo provide `tm` role use `,setrole <user> <role>`\nyou also need to create a role called `tm` in your server below `tishmish(bot's role)`'''
+        help_description = f'''**member commands**\n{mm}\n\n**tm commands**\n{tm}\n\n\n**To use tm-commands, server owner/admin can provide `tm` role to the member**\n**Admin/Owner:**\n
+        Server's **owner/admin** can create a role exactly named `tm` and can set this role for the members who like to use those so called **tm commands**'''
         embed= nextcord.Embed(title="Tishmish Help", description=help_description, color=embed_color)
 
         await ctx.send(embed=embed)
@@ -55,7 +55,7 @@ async def help(ctx, helpstr: Optional[str]):
 # T I S H M I S H commands
 
 @commands.cooldown(1, 2, commands.BucketType.user)
-@bot.command(name='setrole', aliases=[],help='sets an existing role for provided member of the server', pass_context=True)
+@bot.command(name='setrole', aliases=[],help='sets an existing role [which are below **tishmish**(role)] for a user', pass_context=True)
 @commands.has_permissions(administrator=True)
 async def setrole_command(ctx, user: nextcord.Member, role: nextcord.Role):
     await user.add_roles(role)
