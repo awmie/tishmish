@@ -47,7 +47,7 @@ async def help(ctx, helpstr: Optional[str]):
         for j in member_cmds:
             mm += f'`,{j.name}`' + ' '
         help_description = f'''**member commands**\n{mm}\n\n**tm commands**\n{tm}\n\n\n**To use tm-commands, server owner/admin can provide `tm` role to the member**\n**Admin/Owner:**\n
-        Server's **owner/admin** can create a role exactly named `tm` and can set this role for the members who like to use those so called **tm commands**'''
+        Server's **owner/admin** can create a role exactly named `tm` and can set this role for the members who would like to use those so called **tm commands**'''
         embed= nextcord.Embed(title="Tishmish Help", description=help_description, color=embed_color)
 
         await ctx.send(embed=embed)
