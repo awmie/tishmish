@@ -17,27 +17,29 @@ intents.emojis_and_stickers = True
 all_intents = intents.all()
 all_intents= True
 
-bot = commands.Bot(command_prefix=',', intents = intents, description='Premium quality music bot for free!')
+bot = commands.Bot(command_prefix=',', intents = intents, description='Premium quality music bot for free!\nUse headphones for better quality')
 global user_list
 user_list= []
 setattr(wavelink.Player, 'lq', False)
 embed_color = nextcord.Color.from_rgb(128, 67, 255)
 
 bot.remove_command('help')
-
+     
 # T I S M I S H help-command
 @bot.group(invoke_without_command= True)
 async def help(ctx, helpstr: Optional[str]):
-    tm_cmds = [skip_command, del_command, move_command, clear_command, seek_command, volume_command, skipto_command, shuffle_command, loop_command, disconnect_command, loopqueue_command, info_command, setrole_command]
+    tm_cmds = [skip_command, del_command, move_command, clear_command, seek_command, volume_command, skipto_command, shuffle_command, loop_command, disconnect_command, loopqueue_command, setrole_command]
     member_cmds = [ping_command, play_command, pause_command, resume_command, nowplaying_command, queue_command]
     if helpstr is not None:
         for tmcmds in tm_cmds:
             if helpstr == tmcmds.name:
-                embed = nextcord.Embed(title=','+tmcmds.name, description=f'**aliases**: `{tmcmds.aliases}`\n\n`{tmcmds.help}`', color=embed_color)
+                tmalias = ' | '.join([alias for alias in tmcmds.aliases])
+                embed = nextcord.Embed(title=','+tmcmds.name, description=f'**aliases**: {tmalias}\n\n**function**: `{tmcmds.help}`', color=embed_color)
                 await ctx.send(embed=embed)
         for membercmds in member_cmds:
             if helpstr == membercmds.name:
-                embed = nextcord.Embed(title=','+membercmds.name, description=f'**aliases**: `{membercmds.aliases}`\n\n`{membercmds.help}`', color=embed_color)
+                memberalias = ' | '.join([alias for alias in membercmds.aliases])
+                embed = nextcord.Embed(title=','+membercmds.name, description=f'**aliases**: {memberalias}\n\n**function**: `{membercmds.help}`', color=embed_color)
                 await ctx.send(embed=embed)
     if helpstr is None:
         tm = ''
@@ -46,9 +48,13 @@ async def help(ctx, helpstr: Optional[str]):
             tm += f'`,{i.name}`' + ' '
         for j in member_cmds:
             mm += f'`,{j.name}`' + ' '
-        help_description = f'''**member commands**\n{mm}\n\n**tm commands**\n{tm}\n\n\n**To use tm-commands, server owner/admin can provide `tm` role to the member**\n
-        **Admin/Owner:**\n
-        Server's **owner/admin** can create a role exactly named `tm` below **tishmish(role)** and can set this role for the members who would like to use those so called **tm commands**'''
+        help_description = f'''{bot.description}\n\n**member commands**\n{mm}\n\n**tm commands**\n{tm}\n\n\nTo use tm-commands, server owner/admin can provide **tm** role to the member**(check ,setrole command)**\n
+        **For admin/owner:**\n
+        Server's **owner/admin** can create a role exactly named **tm** below **tishmish(role)** and can set this role for the members who would like to use those so called **tm commands**\n
+        (go to **server settings** > **Roles** > **create role** > set role name as **tm** and move it below **tishmish** role)\n\n
+        
+        type **,help <command name>** for more information about that command
+        '''
         embed= nextcord.Embed(title="Tishmish Help", description=help_description, color=embed_color)
 
         await ctx.send(embed=embed)
@@ -56,7 +62,7 @@ async def help(ctx, helpstr: Optional[str]):
 # T I S H M I S H commands
 
 @commands.cooldown(1, 2, commands.BucketType.user)
-@bot.command(name='setrole', aliases=[],help='sets an existing role [which are below **tishmish**(role)] for a user', pass_context=True)
+@bot.command(name='setrole', aliases=[],help='sets an existing role which are below tishmish(role) for a user', pass_context=True)
 @commands.has_permissions(administrator=True)
 async def setrole_command(ctx, user: nextcord.Member, role: nextcord.Role):
     await user.add_roles(role)
@@ -69,12 +75,14 @@ async def ping_command(ctx):
     await ctx.send(embed=em)
 
 async def user_connectivity(ctx: commands.Context):
+    vc: wavelink.Player = ctx.voice_client
     if not getattr(ctx.author.voice, 'channel', None):
         await ctx.send(embed=nextcord.Embed(description=f'Try after joining a `voice channel`', color=embed_color))        
         return False
+    #-->code to check if the bot is connected to vc??<--
     else:   
         return True
-
+            
 @bot.event
 async def on_ready():
     print(f'logged in as: {bot.user.name}')
@@ -248,7 +256,7 @@ async def disconnect_command(ctx: commands.Context):
     else:
         vc : wavelink.Player = ctx.voice_client
         try:
-            await vc.disconnect()
+            await vc.disconnect(force=True)
             await ctx.send(embed=nextcord.Embed(description='**BYE!** Have a great time!', color=embed_color))
         except Exception:
             await ctx.send(embed=nextcord.Embed(description='Failed to destroy!', color=embed_color))
