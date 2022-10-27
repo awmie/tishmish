@@ -19,7 +19,7 @@
 there are some issues but will be fixed soon..
 for better quality use headphones and your internet connectivity also matters..
 
-[extra help](https://user-images.githubusercontent.com/95137415/197322115-2692042a-59d3-4ada-b2b5-5571f78e8ab1.png)
+![image](https://user-images.githubusercontent.com/95137415/197322115-2692042a-59d3-4ada-b2b5-5571f78e8ab1.png)
 
 ### enjoy 
 [bot link](https://discord.com/api/oauth2/authorize?client_id=1007653203711639562&permissions=8&scope=bot)
