@@ -6,7 +6,6 @@ import wavelink
 from wavelink.ext import spotify
 from typing import Optional
 import os
-from dotenv import load_dotenv
 
 # I N T E N T S 
 intents = nextcord.Intents(messages = True, guilds = True)
@@ -470,6 +469,5 @@ async def clear_command(ctx: commands.Context):
 
 '''main'''
 
-load_dotenv()
 if __name__ == '__main__':
-    bot.run(os.getenv("tishmish_token"))
+    bot.run(os.environ("tishmish_token"))
