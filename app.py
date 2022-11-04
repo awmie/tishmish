@@ -92,7 +92,7 @@ async def on_wavelink_node_ready(node: wavelink.Node):
 
 async def node_connect():
     await bot.wait_until_ready()
-    await wavelink.NodePool.create_node(bot=bot, host='krn.2d.gay', port=443, password='AWP)JQ$Gv9}dm.u', https=True)
+    await wavelink.NodePool.create_node(bot=bot, host='lavalink.oops.wtf', port=443, password='www.freelavalink.ga', https=True)
 
 @bot.event
 async def on_wavelink_track_end(player: wavelink.Player, track: wavelink.Track, reason):
