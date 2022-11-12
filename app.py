@@ -465,11 +465,11 @@ async def seek_command(ctx: commands.Context, seekPosition: int):
 @commands.has_role('tm')
 async def clear_command(ctx: commands.Context):
     vc: wavelink.Player = ctx.voice_client
-    if song_count < 1:
+    try:
         vc.queue._queue.clear()
         clear_command_embed = nextcord.Embed(description=f'`QUEUE` cleared', color=embed_color)
         return await ctx.send(embed=clear_command_embed)
-    else:
+    except Exception:
         em = nextcord.Embed(description=f"There's no `QUEUE`", color=embed_color) 
         return ctx.send(em)
 
