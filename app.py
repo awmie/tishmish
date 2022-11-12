@@ -136,11 +136,16 @@ async def info_command(ctx: commands.Context):
 @commands.has_role('tm')
 async def loopqueue_command(ctx: commands.Context, type:str):
     vc: wavelink.Player = ctx.voice_client
-    if not vc.queue.is_empty:
+    if song_count <=1:
         
         if type == 'start' or type == 'enable':
             vc.lq = True
-            return await ctx.send(embed=nextcord.Embed(description='**loopqueue**: `enabled`', color=embed_color))
+            await ctx.send(embed=nextcord.Embed(description='**loopqueue**: `enabled`', color=embed_color))
+            try:
+                vc.queue.put(vc._source)
+            except Exception:
+                return ''
+            
         if type == 'stop' or type == 'disable' and vc.lq is True:
             vc.lq = False
             await ctx.send(embed=nextcord.Embed(description='**loopqueue**: `disabled`', color=embed_color))
@@ -151,7 +156,7 @@ async def loopqueue_command(ctx: commands.Context, type:str):
         if type != 'start' and type != 'enable' and type != 'disable' and type != 'stop':
             return await ctx.send(embed=nextcord.Embed(description='check **,help** for **loopqueue** or **lq**', color=embed_color))
     else:
-        return await ctx.send(embed=nextcord.Embed(description='No songs are addded to the `QUEUE`', color=embed_color))
+        return await ctx.send(embed=nextcord.Embed(description='Unable to loop `QUEUE`, try adding more songs..', color=embed_color))
 
 @commands.cooldown(1, 1, commands.BucketType.user)  
 @bot.command(name='play', aliases=['p'], help='plays the given track provided by the user')
@@ -460,11 +465,16 @@ async def seek_command(ctx: commands.Context, seekPosition: int):
 @commands.has_role('tm')
 async def clear_command(ctx: commands.Context):
     vc: wavelink.Player = ctx.voice_client
-    vc.queue._queue.clear()
-    clear_command_embed = nextcord.Embed(description=f'`QUEUE` cleared', color=embed_color)
-    return await ctx.send(embed=clear_command_embed)
+    if not vc.queue.is_empty:
+        vc.queue._queue.clear()
+        clear_command_embed = nextcord.Embed(description=f'`QUEUE` cleared', color=embed_color)
+        return await ctx.send(embed=clear_command_embed)
+    else:
+        em = nextcord.Embed(description=f"There's no `QUEUE`", color=embed_color) 
+        return ctx.send(em)
 
 '''main'''
 
 if __name__ == '__main__':
     bot.run(os.environ["tishmish_token"])
+    
