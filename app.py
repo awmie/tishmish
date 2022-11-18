@@ -465,16 +465,16 @@ async def seek_command(ctx: commands.Context, seekPosition: int):
 @commands.has_role('tm')
 async def clear_command(ctx: commands.Context):
     vc: wavelink.Player = ctx.voice_client
-    if song_count >= 1:
+    if vc.queue.is_empty:
+        return await ctx.send(embed= nextcord.Embed(description='No `SONGS` are present', color=embed_color))
+    else:
         vc.queue._queue.clear()
         clear_command_embed = nextcord.Embed(description=f'`QUEUE` cleared', color=embed_color)
         return await ctx.send(embed=clear_command_embed)
-    elif song_count == 0:
-        em = nextcord.Embed(description=f"There are no songs added to the `QUEUE`", color=embed_color) 
-        return ctx.send(em)
 
 '''main'''
 
 if __name__ == '__main__':
-    bot.run(os.environ["tishmish_token"])
+    # bot.run(os.environ["tishmish_token"])
+    bot.run('MTAwNzY1MzIwMzcxMTYzOTU2Mg.Gt-1MP.S95Uzhk8Ji5Qe2eNWqC1dxCRl23qJemdomGffA')
     
