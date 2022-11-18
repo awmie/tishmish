@@ -136,7 +136,7 @@ async def info_command(ctx: commands.Context):
 @commands.has_role('tm')
 async def loopqueue_command(ctx: commands.Context, type:str):
     vc: wavelink.Player = ctx.voice_client
-    if song_count <=1:
+    if not vc.queue.is_empty:
         
         if type == 'start' or type == 'enable':
             vc.lq = True
@@ -146,7 +146,7 @@ async def loopqueue_command(ctx: commands.Context, type:str):
             except Exception:
                 return ''
             
-        if type == 'stop' or type == 'disable' and vc.lq is True:
+        if type == 'stop' or type == 'disable':
             vc.lq = False
             await ctx.send(embed=nextcord.Embed(description='**loopqueue**: `disabled`', color=embed_color))
             if song_count == 1 and vc.queue._queue[0] == vc._source:
