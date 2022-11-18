@@ -469,8 +469,8 @@ async def clear_command(ctx: commands.Context):
         vc.queue._queue.clear()
         clear_command_embed = nextcord.Embed(description=f'`QUEUE` cleared', color=embed_color)
         return await ctx.send(embed=clear_command_embed)
-    else:
-        em = nextcord.Embed(description=f"There's no `QUEUE`", color=embed_color) 
+    elif song_count == 0:
+        em = nextcord.Embed(description=f"There are no songs added to the `QUEUE`", color=embed_color) 
         return ctx.send(em)
 
 '''main'''
