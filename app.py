@@ -108,7 +108,7 @@ async def on_wavelink_track_end(player: wavelink.Player, track: wavelink.Track, 
                 vc.queue.put(vc.queue._queue[0])
             next_song = vc.queue.get()
             await vc.play(next_song)
-            return await ctx.send(embed=nextcord.Embed(description=f'**Current song playing from the `QUEUE`**\n\n`{next_song.title}`', color=embed_color))
+            return await ctx.send(embed=nextcord.Embed(description=f'**Current song playing from the `QUEUE`**\n\n`{next_song.title}`', color=embed_color), delete_after=30)
     except:
         await vc.stop()
         return await ctx.send(embed=nextcord.Embed(description=f'No songs in the `QUEUE`', color=embed_color))
@@ -137,24 +137,26 @@ async def info_command(ctx: commands.Context):
 async def loopqueue_command(ctx: commands.Context, type:str):
     vc: wavelink.Player = ctx.voice_client
     if not vc.queue.is_empty:
-        
-        if type == 'start' or type == 'enable':
-            vc.lq = True
-            await ctx.send(embed=nextcord.Embed(description='**loopqueue**: `enabled`', color=embed_color))
-            try:
-                vc.queue.put(vc._source)
-            except Exception:
-                return ''
-            
-        if type == 'stop' or type == 'disable':
-            vc.lq = False
-            await ctx.send(embed=nextcord.Embed(description='**loopqueue**: `disabled`', color=embed_color))
-            if song_count == 1 and vc.queue._queue[0] == vc._source:
-                del vc.queue._queue[0]
-            else:
-                return ''                
+        if vc.lq == False:
+            if type == 'start' or type == 'enable':
+                vc.lq = True
+                await ctx.send(embed=nextcord.Embed(description='**loopqueue**: `enabled`', color=embed_color))
+                try:
+                    if vc._source not in vc.queue:
+                        vc.queue.put(vc._source)
+                    else: ''
+                except Exception:
+                    return ''        
+        if vc.lq == True:
+            if type == 'stop' or type == 'disable':
+                vc.lq = False
+                await ctx.send(embed=nextcord.Embed(description='**loopqueue**: `disabled`', color=embed_color))
+                if song_count == 1 and vc.queue._queue[0] == vc._source:
+                    del vc.queue._queue[0]
+                else:
+                    return ''              
         if type != 'start' and type != 'enable' and type != 'disable' and type != 'stop':
-            return await ctx.send(embed=nextcord.Embed(description='check **,help** for **loopqueue** or **lq**', color=embed_color))
+            await ctx.send(embed=nextcord.Embed(description='check **,help** for **loopqueue**', color=embed_color))
     else:
         return await ctx.send(embed=nextcord.Embed(description='Unable to loop `QUEUE`, try adding more songs..', color=embed_color))
 
@@ -469,11 +471,13 @@ async def clear_command(ctx: commands.Context):
         return await ctx.send(embed= nextcord.Embed(description='No `SONGS` are present', color=embed_color))
     else:
         vc.queue._queue.clear()
+        vc.lq = False
         clear_command_embed = nextcord.Embed(description=f'`QUEUE` cleared', color=embed_color)
         return await ctx.send(embed=clear_command_embed)
 
 '''main'''
 
 if __name__ == '__main__':
-    bot.run(os.environ["tishmish_token"])   
+    # bot.run(os.environ["tishmish_token"])   
+    bot.run('MTAwNzY1MzIwMzcxMTYzOTU2Mg.GG6DhE.w-DuQwv6Kz-n7ZhyyzeTvdMT2Cs3WD8NLItnDk')
     
