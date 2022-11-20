@@ -478,6 +478,4 @@ async def clear_command(ctx: commands.Context):
 '''main'''
 
 if __name__ == '__main__':
-    # bot.run(os.environ["tishmish_token"])   
-    bot.run('MTAwNzY1MzIwMzcxMTYzOTU2Mg.GG6DhE.w-DuQwv6Kz-n7ZhyyzeTvdMT2Cs3WD8NLItnDk')
-    
+    bot.run(os.environ["tishmish_token"])       
