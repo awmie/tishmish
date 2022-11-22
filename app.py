@@ -17,7 +17,7 @@ intents.emojis_and_stickers = True
 all_intents = intents.all()
 all_intents= True
 
-bot = commands.Bot(command_prefix=',', intents = intents, description='Premium quality music bot for free!\nUse headphones for better quality')
+bot = commands.Bot(command_prefix=',', intents = intents, description='Premium quality music bot for free!\nUse headphones for better quality <3')
 global user_list
 user_list= []
 setattr(wavelink.Player, 'lq', False)
@@ -34,12 +34,12 @@ async def help(ctx, helpstr: Optional[str]):
         for tmcmds in tm_cmds:
             if helpstr == tmcmds.name:
                 tmalias = ' | '.join([alias for alias in tmcmds.aliases])
-                embed = nextcord.Embed(title=','+tmcmds.name, description=f'**aliases**: {tmalias}\n\n**function**: `{tmcmds.help}`', color=embed_color)
+                embed = nextcord.Embed(title=','+tmcmds.name, description=f'**aliases**: {tmalias}\n\n**function**: `{tmcmds.help}`\n\n**use**: {tmcmds.description}', color=embed_color)
                 await ctx.send(embed=embed)
         for membercmds in member_cmds:
             if helpstr == membercmds.name:
                 memberalias = ' | '.join([alias for alias in membercmds.aliases])
-                embed = nextcord.Embed(title=','+membercmds.name, description=f'**aliases**: {memberalias}\n\n**function**: `{membercmds.help}`', color=embed_color)
+                embed = nextcord.Embed(title=','+membercmds.name, description=f'**aliases**: {memberalias}\n\n**function**: `{membercmds.help}`\n\n**use**: {membercmds.description}', color=embed_color)
                 await ctx.send(embed=embed)
     if helpstr is None:
         tm = ''
@@ -62,14 +62,14 @@ async def help(ctx, helpstr: Optional[str]):
 # T I S H M I S H commands
 
 @commands.cooldown(1, 2, commands.BucketType.user)
-@bot.command(name='setrole', aliases=[],help='sets an existing role which are below tishmish(role) for a user', pass_context=True)
+@bot.command(name='setrole', aliases=[],help='sets an existing role which are below tishmish(role) for a user', pass_context=True, description=',setrole <role name>')
 @commands.has_permissions(administrator=True)
 async def setrole_command(ctx, user: nextcord.Member, role: nextcord.Role):
     await user.add_roles(role)
     embed = nextcord.Embed(description=f"`{user.name}` has been given a role called: **{role.name}**", color=embed_color)
     await ctx.send(embed=embed)
 
-@bot.command(name='ping', help=f"displays bot's latency")
+@bot.command(name='ping', help=f"displays bot's latency", description=',ping')
 async def ping_command(ctx):    
     em = nextcord.Embed(description=f'**Pong!**\n\n`{round(bot.latency*1000)}`ms', color=embed_color)
     await ctx.send(embed=em)
@@ -132,7 +132,7 @@ async def info_command(ctx: commands.Context):
     await ctx.send(embed=nextcord.Embed(description=f'**Info**\ntotal server count: `{len(bot.guilds)}`', color=embed_color))
     
 @commands.cooldown(1, 2, commands.BucketType.user)        
-@bot.command(name='loopqueue', aliases=['lq'], help='starts the loop queue ==> ,lq start or ,lq enable\nstopes the loop queue ==> ,lq stop or ,lq disable')
+@bot.command(name='loopqueue', aliases=['lq'], help='starts the loop queue ==> ,lq start or ,lq enable\nstopes the loop queue ==> ,lq stop or ,lq disable', description=',lq <mode>')
 @commands.has_role('tm')
 async def loopqueue_command(ctx: commands.Context, type:str):
     vc: wavelink.Player = ctx.voice_client
@@ -161,7 +161,7 @@ async def loopqueue_command(ctx: commands.Context, type:str):
         return await ctx.send(embed=nextcord.Embed(description='Unable to loop `QUEUE`, try adding more songs..', color=embed_color))
 
 @commands.cooldown(1, 1, commands.BucketType.user)  
-@bot.command(name='play', aliases=['p'], help='plays the given track provided by the user')
+@bot.command(name='play', aliases=['p'], help='plays the given track provided by the user', description=',p <song name>')
 async def play_command(ctx: commands.Context, *, search: wavelink.YouTubeTrack):
     
     if not getattr(ctx.author.voice, 'channel', None):
@@ -189,7 +189,7 @@ async def play_command(ctx: commands.Context, *, search: wavelink.YouTubeTrack):
     user_list.append(user_dict)
 
 @commands.cooldown(1, 2, commands.BucketType.user)  
-@bot.command(name='pause', aliases=['stop'], help='pauses the current playing track')
+@bot.command(name='pause', aliases=['stop'], help='pauses the current playing track', description=',pause')
 async def pause_command(ctx: commands.Context):
     if await user_connectivity(ctx) == False:
         return
@@ -207,7 +207,7 @@ async def pause_command(ctx: commands.Context):
             await ctx.send(embed=nextcord.Embed(description='Player is not `playing`!', color=embed_color))
 
 @commands.cooldown(1, 2, commands.BucketType.user)  
-@bot.command(name='resume',aliases=[], help='resumes the paused track')
+@bot.command(name='resume',aliases=[], help='resumes the paused track', description=',resume')
 async def resume_command(ctx: commands.Context):
     if await user_connectivity(ctx) == False:
         return
@@ -225,7 +225,7 @@ async def resume_command(ctx: commands.Context):
             await ctx.send(embed=nextcord.Embed(description='Player is not `playing`!', color=embed_color))
         
 @commands.cooldown(1, 2, commands.BucketType.user)  
-@bot.command(name='skip', aliases=['next', 's'], help='skips to the next track')
+@bot.command(name='skip', aliases=['next', 's'], help='skips to the next track', use = ',s')
 @commands.has_role('tm')
 async def skip_command(ctx: commands.Context):
     if await user_connectivity(ctx) == False:
@@ -252,7 +252,7 @@ async def skip_command(ctx: commands.Context):
             return await ctx.send(embed=nextcord.Embed(description=f'`SKIPPED`!', color=embed_color))
 
 @commands.cooldown(1, 2, commands.BucketType.user)  
-@bot.command(name='disconnect', aliases=['dc', 'leave'], help='disconnects the player from the vc')
+@bot.command(name='disconnect', aliases=['dc', 'leave'], help='disconnects the player from the vc', description=',dc')
 @commands.has_role('tm')
 async def disconnect_command(ctx: commands.Context):
     if await user_connectivity(ctx) == False:
@@ -266,7 +266,7 @@ async def disconnect_command(ctx: commands.Context):
             await ctx.send(embed=nextcord.Embed(description='Failed to destroy!', color=embed_color))
             
 @commands.cooldown(1, 2, commands.BucketType.user)  
-@bot.command(name='nowplaying', aliases=['np'], help='shows the current track information')
+@bot.command(name='nowplaying', aliases=['np'], help='shows the current track information', description=',np')
 async def nowplaying_command(ctx: commands.Context):
     if await user_connectivity(ctx) == False:
         return
@@ -299,7 +299,7 @@ async def nowplaying_command(ctx: commands.Context):
         return await ctx.send(embed=em)
 
 @commands.cooldown(1, 2, commands.BucketType.user)  
-@bot.command(name='loop',aliases=[], help='•loops the current song\n•unloops the current song')
+@bot.command(name='loop',aliases=[], help='•loops the current song\n•unloops the current song', description=',loop')
 @commands.has_role('tm')
 async def loop_command(ctx: commands.Context):
     if await user_connectivity(ctx) == False:
@@ -318,7 +318,7 @@ async def loop_command(ctx: commands.Context):
             return await ctx.send(embed=nextcord.Embed(description='**LOOP**: `disabled`', color=embed_color))
 
 @commands.cooldown(1, 2, commands.BucketType.user)  
-@bot.command(name='queue', aliases=['q', 'track'], help='displays the current queue')
+@bot.command(name='queue', aliases=['q', 'track'], help='displays the current queue', description=',q')
 async def queue_command(ctx: commands.Context):
     if await user_connectivity(ctx) == False:
         return
@@ -342,7 +342,7 @@ async def queue_command(ctx: commands.Context):
         return await ctx.send(embed=em)
 
 @commands.cooldown(1, 2, commands.BucketType.user)  
-@bot.command(name="shuffle", aliases=['mix'], help='shuffles the existing queue randomly')
+@bot.command(name="shuffle", aliases=['mix'], help='shuffles the existing queue randomly', description=',shuffle')
 @commands.has_role('tm')
 async def shuffle_command(ctx: commands.Context):
     if await user_connectivity(ctx) == False:
@@ -358,7 +358,7 @@ async def shuffle_command(ctx: commands.Context):
             return await ctx.send(embed=nextcord.Embed(description=f'`QUEUE` has less than `3 songs`', color=embed_color))
 
 @commands.cooldown(1, 2, commands.BucketType.user)  
-@bot.command(name='del', aliases=['remove', 'drop'], help='deletes the specified track')
+@bot.command(name='del', aliases=['remove', 'drop'], help='deletes the specified track', description=',del <song number>')
 @commands.has_role('tm')
 async def del_command(ctx: commands.Context, position: int):
     if await user_connectivity(ctx) == False:
@@ -378,7 +378,7 @@ async def del_command(ctx: commands.Context, position: int):
             return await ctx.send(embed=nextcord.Embed(description='No songs in the `QUEUE`', color=embed_color))
 
 @commands.cooldown(1, 2, commands.BucketType.user)  
-@bot.command(name='skipto',aliases=['goto'], help='skips to the specified track')
+@bot.command(name='skipto',aliases=['goto'], help='skips to the specified track', description=',skipto <song number>')
 @commands.has_role('tm')
 async def skipto_command(ctx: commands.Context, position: int):
     if await user_connectivity(ctx) == False:
@@ -400,7 +400,7 @@ async def skipto_command(ctx: commands.Context, position: int):
             return await ctx.send(embed=nextcord.Embed(description='No songs in the `QUEUE`', color=embed_color))
 
 @commands.cooldown(1, 2, commands.BucketType.user)  
-@bot.command(name='move', aliases=['set'], help='moves the track to the specified position')
+@bot.command(name='move', aliases=['set'], help='moves the track to the specified position', description=',move <song number> <position>')
 @commands.has_role('tm')
 async def move_command(ctx: commands.Context, song_position: int, move_position: int):
     if await user_connectivity(ctx) == False:
@@ -427,7 +427,7 @@ async def move_command(ctx: commands.Context, song_position: int, move_position:
             return await ctx.send(embed=nextcord.Embed(description='No songs in the `QUEUE`!', color=embed_color))
 
 @commands.cooldown(1, 2, commands.BucketType.user)  
-@bot.command(name='volume',aliases=['vol'], help='sets the volume')
+@bot.command(name='volume',aliases=['vol'], help='sets the volume', description=',vol <number>')
 @commands.has_role('tm')
 async def volume_command(ctx: commands.Context, playervolume: int):
     if await user_connectivity(ctx) == False:
@@ -446,7 +446,7 @@ async def volume_command(ctx: commands.Context, playervolume: int):
             return await ctx.send(embed=nextcord.Embed(description="Player not connected!", color=embed_color))
 
 @commands.cooldown(1, 2, commands.BucketType.user)  
-@bot.command(name='seek', aliases=[], help='seeks or moves the player to specified track position')
+@bot.command(name='seek', aliases=[], help='seeks or moves the player to specified track position', description=',seek <duration>')
 @commands.has_role('tm')
 async def seek_command(ctx: commands.Context, seekPosition: int):
     if await user_connectivity(ctx) == False:
@@ -463,7 +463,7 @@ async def seek_command(ctx: commands.Context, seekPosition: int):
                 return await ctx.send(embed=nextcord.Embed(description=f'SEEK length `{seekPosition}` outta range', color=embed_color))
             
 @commands.cooldown(1, 5, commands.BucketType.user)
-@bot.command(name='clear',aliases=[], help='clears the queue')
+@bot.command(name='clear',aliases=[], help='clears the queue', description=',clear')
 @commands.has_role('tm')
 async def clear_command(ctx: commands.Context):
     vc: wavelink.Player = ctx.voice_client
@@ -478,4 +478,4 @@ async def clear_command(ctx: commands.Context):
 '''main'''
 
 if __name__ == '__main__':
-    bot.run(os.environ["tishmish_token"])       
+    bot.run(os.environ["tishmish_token"])
