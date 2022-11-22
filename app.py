@@ -306,12 +306,13 @@ async def loop_command(ctx: commands.Context):
         return
     else:
         vc: wavelink.Player = ctx.voice_client
-
-        try:
-            vc.loop ^= True
-        except Exception:
-            setattr(vc, 'loop', False)
-        
+        if vc._source:
+            try:
+                vc.loop ^= True
+            except Exception:
+                setattr(vc, 'loop', False)
+        else:
+            return await ctx.send(embed= nextcord.Embed(description='No song to `loop`', color=embed_color))
         if vc.loop:
             return await ctx.send(embed= nextcord.Embed(description='**LOOP**: `enabled`', color=embed_color))
         else:
