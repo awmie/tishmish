@@ -1,5 +1,5 @@
 # T I S H M I S H 
-import datetime, random
+import datetime, random, time
 import nextcord
 from nextcord.ext import commands
 import wavelink
@@ -460,7 +460,8 @@ async def seek_command(ctx: commands.Context, seekPosition: int):
         elif vc.is_playing():
             if 0 <= seekPosition <=  vc.track.length:
                 await vc.seek(seekPosition*1000)
-                return await ctx.send(embed=nextcord.Embed(description=f'Player SEEKED: `{seekPosition}` seconds', color=embed_color))
+                msg = await ctx.send(embed=nextcord.Embed(description='seeking...', color=embed_color))
+                return await msg.edit(embed=nextcord.Embed(description=f'Player SEEKED: `{seekPosition}` seconds',color=embed_color))
             else:
                 return await ctx.send(embed=nextcord.Embed(description=f'SEEK length `{seekPosition}` outta range', color=embed_color))
             
