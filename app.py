@@ -62,13 +62,14 @@ async def help(ctx, helpstr: Optional[str]):
 # T I S H M I S H commands
 
 @commands.cooldown(1, 2, commands.BucketType.user)
-@bot.command(name='setrole', aliases=[],help='sets an existing role which are below tishmish(role) for a user', pass_context=True, description=',setrole <role name>')
+@bot.command(name='setrole', aliases=['giverole'],help='sets an existing role which are below tishmish(role) for a user', pass_context=True, description=',setrole <role name>')
 @commands.has_permissions(administrator=True)
 async def setrole_command(ctx, user: nextcord.Member, role: nextcord.Role):
     await user.add_roles(role)
     embed = nextcord.Embed(description=f"`{user.name}` has been given a role called: **{role.name}**", color=embed_color)
     await ctx.send(embed=embed)
-
+    
+@commands.cooldown(1, 2, commands.BucketType.user)
 @bot.command(name='ping', help=f"displays bot's latency", description=',ping')
 async def ping_command(ctx):    
     em = nextcord.Embed(description=f'**Pong!**\n\n`{round(bot.latency*1000)}`ms', color=embed_color)
@@ -330,17 +331,17 @@ async def queue_command(ctx: commands.Context):
             return await ctx.send(embed= nextcord.Embed(description='**QUEUE**\n\n`empty`', color=embed_color))
         
         lqstr = '`disabled`' if vc.lq == False else '`enabled`'
-        
-        em = nextcord.Embed(description=f'**QUEUE**\n\n**loopqueue**: {lqstr}',color=embed_color)
+        global qem
+        qem = nextcord.Embed(description=f'**QUEUE**\n\n**loopqueue**: {lqstr}',color=embed_color)
         global song_count, song, song_queue
         song_queue = vc.queue.copy()
         song_count = 0
         for song in song_queue:
             song_count += 1
             title = song.info['title']
-            em.add_field(name=f'‎', value=f'**{song_count}**•{title}',inline=False)
+            qem.add_field(name=f'‎', value=f'**{song_count}**•{title}',inline=False)
     
-        return await ctx.send(embed=em)
+        return await ctx.send(embed=qem)
 
 @commands.cooldown(1, 2, commands.BucketType.user)  
 @bot.command(name="shuffle", aliases=['mix'], help='shuffles the existing queue randomly', description=',shuffle')
@@ -468,14 +469,41 @@ async def seek_command(ctx: commands.Context, seekPosition: int):
 @commands.has_role('tm')
 async def clear_command(ctx: commands.Context):
     vc: wavelink.Player = ctx.voice_client
-    if vc.queue.is_empty:
-        return await ctx.send(embed= nextcord.Embed(description='No `SONGS` are present', color=embed_color))
+    if await user_connectivity(ctx) == False:
+        return
     else:
-        vc.queue._queue.clear()
-        vc.lq = False
-        clear_command_embed = nextcord.Embed(description=f'`QUEUE` cleared', color=embed_color)
-        return await ctx.send(embed=clear_command_embed)
+        if vc.queue.is_empty:
+            return await ctx.send(embed= nextcord.Embed(description='No `SONGS` are present', color=embed_color))
+        else:
+            vc.queue._queue.clear()
+            vc.lq = False
+            clear_command_embed = nextcord.Embed(description=f'`QUEUE` cleared', color=embed_color)
+            return await ctx.send(embed=clear_command_embed)
 
+@commands.cooldown(1, 2, commands.BucketType.user)
+@bot.command(name='save', aliases=['dm'], description=",save <song number | 'queue' | 'q'>", help='dms the song to the user')
+async def save_command(ctx: commands.Context, savestr: Optional[str]):
+    vc: wavelink.Player = ctx.voice_client
+    if await user_connectivity(ctx) == False:
+        return
+    else:
+        user = await bot.fetch_user(ctx.author._user.id)
+        if vc._source and savestr is None:
+            await user.send(embed=nextcord.Embed(description=vc._source, color=embed_color))
+        elif not vc.queue.is_empty and savestr == 'q' or savestr == 'queue':
+            await user.send(embed=qem)
+        elif not vc.queue.is_empty and savestr:
+            if int(savestr) <= 0:
+                return await ctx.send(embed=nextcord.Embed(description=f'Position can not be `ZERO`* or `LESSER`', color=embed_color))
+            elif int(savestr) > song_count:
+                return await ctx.send(embed=nextcord.Embed(description=f'Position `{savestr}` is outta range', color=embed_color))
+            else:
+                song_info = vc.queue._queue[int(savestr) - 1]
+                em=nextcord.Embed(description=song_info.info['title'], color=embed_color)
+                await user.send(embed=em)
+        else:
+            return await ctx.send(embed=nextcord.Embed(description='There is no `song` | `queue` available', color=embed_color))
+        
 '''main'''
 
 if __name__ == '__main__':
