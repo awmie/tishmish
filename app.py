@@ -29,7 +29,7 @@ bot.remove_command('help')
 @bot.group(invoke_without_command= True)
 async def help(ctx, helpstr: Optional[str]):
     tm_cmds = [skip_command, del_command, move_command, clear_command, seek_command, volume_command, skipto_command, shuffle_command, loop_command, disconnect_command, loopqueue_command, setrole_command]
-    member_cmds = [ping_command, play_command, pause_command, resume_command, nowplaying_command, queue_command]
+    member_cmds = [ping_command, play_command, pause_command, resume_command, nowplaying_command, queue_command, save_command]
     if helpstr is not None:
         for tmcmds in tm_cmds:
             if helpstr == tmcmds.name:
