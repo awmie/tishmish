@@ -487,7 +487,7 @@ async def save_command(ctx: commands.Context, savestr: Optional[str]):
     else:
         user = await bot.fetch_user(ctx.author._user.id)
         if vc._source and savestr is None:
-            await user.send(embed=nextcord.Embed(description=vc._source, color=embed_color))
+            await user.send(embed=nextcord.Embed(description=f'`{vc._source}`', color=embed_color))
         elif not vc.queue.is_empty and savestr == 'q' or savestr == 'queue':
             await user.send(embed=qem)
         elif not vc.queue.is_empty and savestr:
