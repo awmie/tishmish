@@ -197,7 +197,7 @@ async def pause_command(ctx: commands.Context):
     else:
         vc: wavelink.Player = ctx.voice_client
 
-        if vc.is_playing():
+        if vc._source:
             if not vc.is_paused():
                 await vc.pause()
                 await ctx.send(embed=nextcord.Embed(description='`PAUSED` the music!', color=embed_color))
