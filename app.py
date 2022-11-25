@@ -126,7 +126,7 @@ async def on_command_error(ctx: commands.Context, error):
         await ctx.send(embed=nextcord.Embed(description="Missing `arguments`", color=embed_color))
 
 @commands.cooldown(1, 2, commands.BucketType.user)
-@bot.command(name='info',aliases=[], help='shows information about the bot')
+@bot.command(name='info',aliases=['i'], help='shows information about the bot')
 @commands.is_owner()
 @commands.has_role('tm')
 async def info_command(ctx: commands.Context):
@@ -204,7 +204,7 @@ async def pause_command(ctx: commands.Context):
 
             elif vc.is_paused():
                 await ctx.send(embed=nextcord.Embed(description='Already in `PAUSED State`', color=embed_color))
-        else:
+        elif not vc._source:
             await ctx.send(embed=nextcord.Embed(description='Player is not `playing`!', color=embed_color))
 
 @commands.cooldown(1, 2, commands.BucketType.user)  
@@ -235,10 +235,7 @@ async def skip_command(ctx: commands.Context):
         vc: wavelink.Player = ctx.voice_client
 
         if vc.loop == True:
-            vclooptxt = ''
-            vclooptxt+=('Disable the `LOOP` to skip\n')
-            vclooptxt+=('  • **,loop** again to disable the `LOOP` or\n')
-            vclooptxt+=('  • Add a new song to disable the `LOOP`\n')
+            vclooptxt = 'Disable the `LOOP` to skip | **,loop** again to disable the `LOOP` | Add a new song to disable the `LOOP`'
             return await ctx.send(embed=nextcord.Embed(description=vclooptxt, color=embed_color))
 
         elif vc.queue.is_empty:
