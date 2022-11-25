@@ -482,7 +482,7 @@ async def clear_command(ctx: commands.Context):
             return await ctx.send(embed=clear_command_embed)
 
 @commands.cooldown(1, 2, commands.BucketType.user)
-@bot.command(name='save', aliases=['dm'], description=",save <song number | 'queue' | 'q'>", help='dms the song to the user')
+@bot.command(name='save', aliases=['dm'], description=",save\n,save <song number | 'queue' | 'q'>", help='dms the current | specified song to the user')
 async def save_command(ctx: commands.Context, savestr: Optional[str]):
     vc: wavelink.Player = ctx.voice_client
     if await user_connectivity(ctx) == False:
