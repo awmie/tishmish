@@ -172,10 +172,10 @@ async def play_command(ctx: commands.Context, *, search: wavelink.YouTubeTrack):
     else:
         vc: wavelink.Player = ctx.voice_client
 
-    if vc.queue.is_empty and vc.is_playing() is False:    
+    if vc.queue.is_empty and vc.is_playing() is False:   
+        playString = await ctx.send(embed=nextcord.Embed(description='**searching...**', color=embed_color))
         await vc.play(search)
-        playString = nextcord.Embed(description=f'**Search found**\n\n`{search.title}`', color=embed_color)
-        await ctx.send(embed=playString)
+        await playString.edit(embed=nextcord.Embed(description=f'**Search found**\n\n`{search.title}`', color=embed_color))
 
     else:
         await vc.queue.put_wait(search)
