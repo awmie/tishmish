@@ -2,5 +2,6 @@ aiohttp==3.8.1
 aiosignal==1.2.0
 async-generator==1.10
 async-timeout==4.0.2
-wavelink @ git+https://github.com/PythonistaGuild/Wavelink@7e619b4e9509cf63f711ad5ad60b66b6d2c443a6
 nextcord==2.1.0
+numpy==1.23.0
+wavelink @ git+https://github.com/PythonistaGuild/Wavelink@7e619b4e9509cf63f711ad5ad60b66b6d2c443a6
