@@ -1,11 +1,12 @@
 # T I S H M I S H 
-import datetime, random, time
+import datetime, random
 import nextcord
 from nextcord.ext import commands
 import wavelink
 from wavelink.ext import spotify
 from typing import Optional
 import os
+import numpy as np
 
 # I N T E N T S 
 intents = nextcord.Intents(messages = True, guilds = True)
@@ -18,8 +19,10 @@ all_intents = intents.all()
 all_intents= True
 
 bot = commands.Bot(command_prefix=',', intents = intents, description='Premium quality music bot for free!\nUse headphones for better quality <3')
-global user_list
-user_list= []
+# some useful variables
+global user_arr, user_dict
+user_dict = {} 
+user_arr = np.array([])
 setattr(wavelink.Player, 'lq', False)
 embed_color = nextcord.Color.from_rgb(128, 67, 255)
 
@@ -93,7 +96,7 @@ async def on_wavelink_node_ready(node: wavelink.Node):
 
 async def node_connect():
     await bot.wait_until_ready()
-    await wavelink.NodePool.create_node(bot=bot, host='lavalink.oops.wtf', port=443, password='www.freelavalink.ga', https=True)
+    await wavelink.NodePool.create_node(bot=bot, host='node1.kartadharta.xyz', port=443, password='kdlavalink', https=True, spotify_client=spotify.SpotifyClient(client_id=os.environ['spotify_id'],client_secret=os.environ['spotify_secret']))
 
 @bot.event
 async def on_wavelink_track_end(player: wavelink.Player, track: wavelink.Track, reason):
@@ -109,7 +112,8 @@ async def on_wavelink_track_end(player: wavelink.Player, track: wavelink.Track, 
                 vc.queue.put(vc.queue._queue[0])
             next_song = vc.queue.get()
             await vc.play(next_song)
-            return await ctx.send(embed=nextcord.Embed(description=f'**Current song playing from the `QUEUE`**\n\n`{next_song.title}`', color=embed_color), delete_after=30)
+            await ctx.send(embed=nextcord.Embed(description=f'**Current song playing from the `QUEUE`**\n\n`{next_song.title}`', color=embed_color), delete_after=30)
+            #{code to remove the song name from the numpy array}
     except:
         await vc.stop()
         return await ctx.send(embed=nextcord.Embed(description=f'No songs in the `QUEUE`', color=embed_color))
@@ -185,10 +189,31 @@ async def play_command(ctx: commands.Context, *, search: wavelink.YouTubeTrack):
 
     setattr(vc, 'loop', False)
 
-    user_dict = {}
-    user_dict[search.title] =ctx.author._user.name
-    user_list.append(user_dict)
+    user_dict[search.title] = ctx.author.mention
+    
+@commands.cooldown(1, 1, commands.BucketType.user) 
+@bot.command(name='splay', aliases=['sp'])
+async def spotifyplay_command(ctx: commands.Context, search: str):
 
+    if not getattr(ctx.author.voice, 'channel', None):
+        return await ctx.send(embed=nextcord.Embed(description=f'Try after joining voice channel', color=embed_color))        
+    elif not ctx.voice_client:
+        vc: wavelink.Player = await ctx.author.voice.channel.connect(cls=wavelink.Player)
+    else:
+        vc: wavelink.Player = ctx.voice_client
+    
+    async for partial in spotify.SpotifyTrack.iterator(query=search, type=spotify.SpotifySearchType.playlist, partial_tracks=True):
+        if vc.queue.is_empty and vc.is_playing() is False:
+            await vc.play(partial)
+        else:
+            await vc.queue.put_wait(partial)
+        song_name = await wavelink.tracks.YouTubeTrack.search(partial.title)
+        user_dict[song_name[0].title] = ctx.author.mention
+        
+    vc.ctx = ctx 
+    
+    setattr(vc, 'loop', False)
+             
 @commands.cooldown(1, 2, commands.BucketType.user)  
 @bot.command(name='pause', aliases=['stop'], help='pauses the current playing track', description=',pause')
 async def pause_command(ctx: commands.Context):
@@ -283,13 +308,17 @@ async def nowplaying_command(ctx: commands.Context):
             state = 'paused'
         else:
             state = 'playing'
+            
+        '''numpy array usertag indexing'''    
+        global user_list
+        user_list = list(user_dict.items())
+        user_arr = np.array(user_list)
+        song_index = np.flatnonzero(np.core.defchararray.find(user_arr,vc.track.title) ==0)
+        arr_index = int(song_index/2)
         
-        for song_req in user_list:
-            for song_key in song_req.keys():
-                if song_key == vc.track.title:
-                    requester = (song_req.get(vc.track.title))
-
-        nowplaying_description = f'[`{vc.track.title}`]({str(vc.track.uri)})\n\n**Requested by**: `{requester}`'
+        requester = user_arr[arr_index,1]
+        
+        nowplaying_description = f'[`{vc.track.title}`]({str(vc.track.uri)})\n\n**Requested by**: {requester}'
         em = nextcord.Embed(description=f'**Now Playing**\n\n{nowplaying_description}', color=embed_color)
         em.add_field(name='**Song Info**', value=f'• Author: `{vc.track.author}`\n• Duration: `{str(datetime.timedelta(seconds=vc.track.length))}`')
         em.add_field(name='**Player Info**', value=f'• Player Volume: `{vc._volume}`\n• Loop: `{loopstr}`\n• Current State: `{state}`', inline=False)
@@ -335,10 +364,14 @@ async def queue_command(ctx: commands.Context):
         song_count = 0
         for song in song_queue:
             song_count += 1
-            title = song.info['title']
-            qem.add_field(name=f'‎', value=f'**{song_count}**•{title}',inline=False)
+            if wavelink.tracks.PartialTrack:
+                title = song.title
+            else:
+                title = song.info['title'] 
+            qem.add_field(name=f'‎', value=f'**{song_count} **• {title}',inline=False)
     
-        return await ctx.send(embed=qem)
+        await ctx.send(embed=qem)
+        return commands.Paginator(prefix='>', suffix='<', linesep='\n')
 
 @commands.cooldown(1, 2, commands.BucketType.user)  
 @bot.command(name="shuffle", aliases=['mix'], help='shuffles the existing queue randomly', description=',shuffle')
