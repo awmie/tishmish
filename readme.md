@@ -1,15 +1,16 @@
-# tishmish
-
-#### premium discord music bot
-  - youtube support 
-  - hd sound
-
-#### spotify playlist support comming soon(may be in new year)
-
-#### how to start this bot 
+# Tishmish
+#### Premium Discord -music bot-
+  - youtube, spotify playlist support 
+  - hd sound (use headphones)
+### Introducing new spotify integration with our Tishmish
+  - command : **,sp**
+  - use : ,sp < spotify playlist link >
+  - function : plays the provided spotify playlist (adds to the queue)
+#### how to start this bot: 
 - type **,help** command to get started
 - it will show a list of commands
-  - which will include member and **tm** commands
+- type ,help < any command name > for more info on that command
+- which will include member and **tm** commands
 
 ##### what are tm commands
   - this is created show only chosen members by owner or admin can use those specific commands
@@ -21,5 +22,5 @@ for better quality use headphones and your internet connectivity also matters..
 
 ![image](https://user-images.githubusercontent.com/95137415/197322115-2692042a-59d3-4ada-b2b5-5571f78e8ab1.png)
 
-### enjoy 
+### enjoy :)
 [bot link](https://discord.com/api/oauth2/authorize?client_id=1007653203711639562&permissions=8&scope=bot)
