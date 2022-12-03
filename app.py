@@ -313,7 +313,6 @@ async def nowplaying_command(ctx: commands.Context):
         global user_list
         user_list = list(user_dict.items())
         user_arr = np.array(user_list)
-        user_arr = np.unique(user_arr,axis=0) #resolving duplicacy 
         song_index = np.flatnonzero(np.core.defchararray.find(user_arr,vc.track.identifier) ==0)
         arr_index = int(song_index/2)
         
