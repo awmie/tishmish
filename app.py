@@ -189,7 +189,7 @@ async def play_command(ctx: commands.Context, *, search: wavelink.YouTubeTrack):
 
     setattr(vc, 'loop', False)
 
-    user_dict[search.title] = ctx.author.mention
+    user_dict[search.identifier] = ctx.author.mention
     
 @commands.cooldown(1, 1, commands.BucketType.user) 
 @bot.command(name='splay', aliases=['sp'], help='plays the provided spotify playlist link', description=',sp <spotify playlist link>')
@@ -208,7 +208,7 @@ async def spotifyplay_command(ctx: commands.Context, search: str):
         else:
             await vc.queue.put_wait(partial)
         song_name = await wavelink.tracks.YouTubeTrack.search(partial.title)
-        user_dict[song_name[0].title] = ctx.author.mention
+        user_dict[song_name[0].identifier] = ctx.author.mention
         
     vc.ctx = ctx 
     
@@ -313,7 +313,7 @@ async def nowplaying_command(ctx: commands.Context):
         global user_list
         user_list = list(user_dict.items())
         user_arr = np.array(user_list)
-        song_index = np.flatnonzero(np.core.defchararray.find(user_arr,vc.track.title) ==0)
+        song_index = np.flatnonzero(np.core.defchararray.find(user_arr,vc.track.identifier) ==0)
         arr_index = int(song_index/2)
         
         requester = user_arr[arr_index,1]
