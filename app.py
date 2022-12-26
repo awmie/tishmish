@@ -7,8 +7,7 @@ from wavelink.ext import spotify
 from typing import Optional
 import os
 import numpy as np
-from dotenv import load_dotenv
-load_dotenv()
+
 # I N T E N T S 
 intents = nextcord.Intents(messages = True, guilds = True)
 intents.guild_messages = True
@@ -97,7 +96,7 @@ async def on_wavelink_node_ready(node: wavelink.Node):
 
 async def node_connect():
     await bot.wait_until_ready()
-    await wavelink.NodePool.create_node(bot=bot, host='node1.kartadharta.xyz', port=443, password='kdlavalink', https=True, spotify_client=spotify.SpotifyClient(client_id=os.getenv('spotify_id'),client_secret=os.getenv('spotify_secret')))
+    await wavelink.NodePool.create_node(bot=bot, host='node1.kartadharta.xyz', port=443, password='kdlavalink', https=True, spotify_client=spotify.SpotifyClient(client_id=os.environ['spotify_id'],client_secret=os.environ['spotify_secret']))
 
 @bot.event
 async def on_wavelink_track_end(player: wavelink.Player, track: wavelink.Track, reason):
@@ -539,4 +538,4 @@ async def save_command(ctx: commands.Context, savestr: Optional[str]):
 '''main'''
 
 if __name__ == '__main__':
-    bot.run(os.getenv("tishmish_token"))
+    bot.run(os.environ["tishmish_token"])
