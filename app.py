@@ -7,7 +7,8 @@ from wavelink.ext import spotify
 from typing import Optional
 import os
 import numpy as np
-
+from dotenv import load_dotenv
+load_dotenv()
 # I N T E N T S 
 intents = nextcord.Intents(messages = True, guilds = True)
 intents.guild_messages = True
