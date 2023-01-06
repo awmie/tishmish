@@ -24,3 +24,9 @@ for better quality use headphones and your internet connectivity also matters..
 
 ### enjoy :)
 [bot link](https://discord.com/api/oauth2/authorize?client_id=1007653203711639562&permissions=8&scope=bot)
+
+### warning 
+- do not directly disconnect the bot from the channel 👉🏼 [here's the issue](https://github.com/awmie/tishmish/issues/1#issue-1432576605)
+- it will be fixed soon until then you can use the **,dc** or **,leave** to make the bot disappear from the voice channel.
+- you should create a **'tm'** role in your server (don't forget to move the role below **tishmish** role) and you can assign the **tm** role to your friends for full accessibility of the bot.
+- thanks 
