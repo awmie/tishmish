@@ -536,42 +536,42 @@ async def save_command(ctx: commands.Context, savestr: Optional[str]):
             return await ctx.send(embed=nextcord.Embed(description='There is no `song` | `queue` available', color=embed_color))
         
         
-@commands.cooldown(1,2, commands.BucketType.user)
-@bot.command(name='lyrics', aliases=['l'], description=",lyrics | ,l", help='searches the lyrics for current song being played')
-async def lyrics_command(ctx: commands.Context):
-    vc: wavelink.Player = ctx.voice_client
-    if await user_connectivity(ctx) == False:
-        return
-    else:
-        mylyrics = []
-        genius = lyricsgenius.Genius(access_token=os.environ['lyrics_token'])
-        songstr = vc.track.title
-        searchmssg = await ctx.send(embed=nextcord.Embed(description=f'**searching the lyrics for {vc.track.title}...**', color = embed_color))
-        if '-' and '(' in songstr:
-            song = songstr.split(' - ')[1].split('(')[0]
-            author = songstr.split(' - ')[0]
-        elif '-' and '[' in songstr:
-            song = songstr.split(' - ')[1].split('[')[0]
-            author = songstr.split(' - ')[0]
-        elif '-' and '|' in songstr:
-            song = songstr.split(' - ')[1]
-            author = songstr.split(' - ')[0]
-        elif '|' in songstr:
-            song = songstr.split('|')[0]
-            author = songstr.split('|')[1]
-        else:
-            song = songstr
-            author = vc.track.author
-        # genius.verbose = False # Turn off status messages
-        genius.remove_section_headers = True    
-        songvalue = genius.search_song(song, author)
-        mylyrics.append(songvalue.lyrics)
-        if mylyrics is not None:
-            for i in mylyrics:
-                await ctx.send(embed=nextcord.Embed(description=f'{i}', color=embed_color))
-                await searchmssg.edit(embed=nextcord.Embed(description='**Search found!**', color=embed_color))
-        else:
-            await searchmssg.edit(embed=nextcord.Embed(description='**No lyrics found!**', color=embed_color))
+# @commands.cooldown(1,2, commands.BucketType.user)
+# @bot.command(name='lyrics', aliases=['l'], description=",lyrics | ,l", help='searches the lyrics for current song being played')
+# async def lyrics_command(ctx: commands.Context):
+#     vc: wavelink.Player = ctx.voice_client
+#     if await user_connectivity(ctx) == False:
+#         return
+#     else:
+#         mylyrics = []
+#         genius = lyricsgenius.Genius(access_token=os.environ['lyrics_token'])
+#         songstr = vc.track.title
+#         searchmssg = await ctx.send(embed=nextcord.Embed(description=f'**searching the lyrics for {vc.track.title}...**', color = embed_color))
+#         if '-' and '(' in songstr:
+#             song = songstr.split(' - ')[1].split('(')[0]
+#             author = songstr.split(' - ')[0]
+#         elif '-' and '[' in songstr:
+#             song = songstr.split(' - ')[1].split('[')[0]
+#             author = songstr.split(' - ')[0]
+#         elif '-' and '|' in songstr:
+#             song = songstr.split(' - ')[1]
+#             author = songstr.split(' - ')[0]
+#         elif '|' in songstr:
+#             song = songstr.split('|')[0]
+#             author = songstr.split('|')[1]
+#         else:
+#             song = songstr
+#             author = vc.track.author
+#         # genius.verbose = False # Turn off status messages
+#         genius.remove_section_headers = True    
+#         songvalue = genius.search_song(song, author)
+#         mylyrics.append(songvalue.lyrics)
+#         if mylyrics is not None:
+#             for i in mylyrics:
+#                 await ctx.send(embed=nextcord.Embed(description=f'{i}', color=embed_color))
+#                 await searchmssg.edit(embed=nextcord.Embed(description='**Search found!**', color=embed_color))
+#         else:
+#             await searchmssg.edit(embed=nextcord.Embed(description='**No lyrics found!**', color=embed_color))
 '''main'''
 
 if __name__ == '__main__':
