@@ -98,7 +98,6 @@ async def on_wavelink_node_ready(node: wavelink.Node):
 async def node_connect():
     await bot.wait_until_ready()
     await wavelink.NodePool.create_node(bot=bot, host='node1.kartadharta.xyz', port=443, password='kdlavalink', https=True, spotify_client=spotify.SpotifyClient(client_id=os.environ['spotify_id'],client_secret=os.environ['spotify_secret']))
-
 @bot.event
 async def on_wavelink_track_end(player: wavelink.Player, track: wavelink.Track, reason):
     ctx = player.ctx
@@ -544,7 +543,7 @@ async def lyrics_command(ctx: commands.Context):
     if await user_connectivity(ctx) == False:
         return
     else:
-        token = '8zLAXdzwoYMVN5yKWmCWZQuntmSU1NOkCaJ4n-hbefs2-VX-D7w-iVmW92NsXewOGXWU8xtYdqUJVZOLpndlxA'
+        token = os.environ['lyrics_token']
         genius = lyricsgenius.Genius(token)
         songstr = vc.track.title
         searchmssg = await ctx.send(embed=nextcord.Embed(description=f'**searching the lyrics for {vc.track.title}...**', color = embed_color))
