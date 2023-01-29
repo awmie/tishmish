@@ -562,7 +562,7 @@ async def lyrics_command(ctx: commands.Context):
         else:
             song = songstr
             author = vc.track.author
-        # genius.verbose = False # Turn off status messages
+        genius.verbose = False # Turn off status messages
         genius.remove_section_headers = True    
         songvalue = genius.search_song(song, author)
         lyrics = songvalue.lyrics
