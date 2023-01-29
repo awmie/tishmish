@@ -544,7 +544,7 @@ async def lyrics_command(ctx: commands.Context):
         return
     else:
         mylyrics = []
-        genius = lyricsgenius.Genius(os.environ['lyrics_token'])
+        genius = lyricsgenius.Genius(access_token=os.environ['lyrics_token'])
         songstr = vc.track.title
         searchmssg = await ctx.send(embed=nextcord.Embed(description=f'**searching the lyrics for {vc.track.title}...**', color = embed_color))
         if '-' and '(' in songstr:
