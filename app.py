@@ -543,6 +543,7 @@ async def lyrics_command(ctx: commands.Context):
     if await user_connectivity(ctx) == False:
         return
     else:
+        mylyrics = []
         genius = lyricsgenius.Genius(os.environ['lyrics_token'])
         songstr = vc.track.title
         searchmssg = await ctx.send(embed=nextcord.Embed(description=f'**searching the lyrics for {vc.track.title}...**', color = embed_color))
@@ -564,9 +565,9 @@ async def lyrics_command(ctx: commands.Context):
         genius.verbose = False # Turn off status messages
         genius.remove_section_headers = True    
         songvalue = genius.search_song(song, author)
-        lyrics = songvalue.lyrics
-        if lyrics is not None:
-            for i in lyrics.split('\n\n'):
+        mylyrics.append(songvalue.lyrics)
+        if mylyrics is not None:
+            for i in mylyrics:
                 await ctx.send(embed=nextcord.Embed(description=i, color=embed_color))
                 await searchmssg.edit(embed=nextcord.Embed(description='**Search found!**', color=embed_color))
         else:
