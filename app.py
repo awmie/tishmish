@@ -7,6 +7,7 @@ from wavelink.ext import spotify
 from typing import Optional
 import os
 import numpy as np
+import lyricsgenius
 
 # I N T E N T S 
 intents = nextcord.Intents(messages = True, guilds = True)
@@ -27,7 +28,7 @@ setattr(wavelink.Player, 'lq', False)
 embed_color = nextcord.Color.from_rgb(128, 67, 255)
 
 bot.remove_command('help')
-     
+   
 # T I S M I S H help-command
 @bot.group(invoke_without_command= True)
 async def help(ctx, helpstr: Optional[str]):
@@ -79,7 +80,7 @@ async def ping_command(ctx):
     await ctx.send(embed=em)
 
 async def user_connectivity(ctx: commands.Context):
-    vc: wavelink.Player = ctx.voice_client
+    # vc: wavelink.Player = ctx.voice_client
     if not getattr(ctx.author.voice, 'channel', None):
         await ctx.send(embed=nextcord.Embed(description=f'Try after joining a `voice channel`', color=embed_color))        
         return False
@@ -194,7 +195,7 @@ async def play_command(ctx: commands.Context, *, search: wavelink.YouTubeTrack):
 @commands.cooldown(1, 1, commands.BucketType.user) 
 @bot.command(name='splay', aliases=['sp'], help='plays the provided spotify playlist link', description=',sp <spotify playlist link>')
 async def spotifyplay_command(ctx: commands.Context, search: str):
-
+   
     if not getattr(ctx.author.voice, 'channel', None):
         return await ctx.send(embed=nextcord.Embed(description=f'Try after joining voice channel', color=embed_color))        
     elif not ctx.voice_client:
@@ -208,7 +209,7 @@ async def spotifyplay_command(ctx: commands.Context, search: str):
         else:
             await vc.queue.put_wait(partial)
         song_name = await wavelink.tracks.YouTubeTrack.search(partial.title)
-        user_dict[song_name[0].identifier] = ctx.author.mention
+        user_dict[song_name[0].identifier] = ctx.author.mention 
         
     vc.ctx = ctx 
     
@@ -535,6 +536,43 @@ async def save_command(ctx: commands.Context, savestr: Optional[str]):
         else:
             return await ctx.send(embed=nextcord.Embed(description='There is no `song` | `queue` available', color=embed_color))
         
+        
+@commands.cooldown(1,2, commands.BucketType.user)
+@bot.command(name='lyrics', aliases=['l'], description=",lyrics | ,l", help='searches the lyrics for current song being played')
+async def lyrics_command(ctx: commands.Context):
+    vc: wavelink.Player = ctx.voice_client
+    if await user_connectivity(ctx) == False:
+        return
+    else:
+        token = os.environ['lyrics_token']
+        genius = lyricsgenius.Genius(token)
+        songstr = vc.track.title
+        searchmssg = await ctx.send(embed=nextcord.Embed(description=f'**searching the lyrics for {vc.track.title}...**', color = embed_color))
+        if '-' and '(' in songstr:
+            song = songstr.split(' - ')[1].split('(')[0]
+            author = songstr.split(' - ')[0]
+        elif '-' and '[' in songstr:
+            song = songstr.split(' - ')[1].split('[')[0]
+            author = songstr.split(' - ')[0]
+        elif '-' and '|' in songstr:
+            song = songstr.split(' - ')[1]
+            author = songstr.split(' - ')[0]
+        elif '|' in songstr:
+            song = songstr.split('|')[0]
+            author = songstr.split('|')[1]
+        else:
+            song = songstr
+            author = vc.track.author
+        # genius.verbose = False # Turn off status messages
+        genius.remove_section_headers = True    
+        songvalue = genius.search_song(song, author)
+        lyrics = songvalue.lyrics
+        if lyrics is not None:
+            for i in lyrics.split('\n\n'):
+                await ctx.send(embed=nextcord.Embed(description=i, color=embed_color))
+                await searchmssg.edit(embed=nextcord.Embed(description='**Search found!**', color=embed_color))
+        else:
+            await searchmssg.edit(embed=nextcord.Embed(description='**No lyrics found!**', color=embed_color))
 '''main'''
 
 if __name__ == '__main__':
