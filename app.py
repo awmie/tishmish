@@ -562,13 +562,13 @@ async def lyrics_command(ctx: commands.Context):
         else:
             song = songstr
             author = vc.track.author
-        genius.verbose = False # Turn off status messages
+        # genius.verbose = False # Turn off status messages
         genius.remove_section_headers = True    
         songvalue = genius.search_song(song, author)
         mylyrics.append(songvalue.lyrics)
         if mylyrics is not None:
             for i in mylyrics:
-                await ctx.send(embed=nextcord.Embed(description=i, color=embed_color))
+                await ctx.send(embed=nextcord.Embed(description=f'{i}', color=embed_color))
                 await searchmssg.edit(embed=nextcord.Embed(description='**Search found!**', color=embed_color))
         else:
             await searchmssg.edit(embed=nextcord.Embed(description='**No lyrics found!**', color=embed_color))
@@ -576,3 +576,4 @@ async def lyrics_command(ctx: commands.Context):
 
 if __name__ == '__main__':
     bot.run(os.environ["tishmish_token"])
+    
