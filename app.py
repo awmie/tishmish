@@ -245,7 +245,7 @@ async def resume_command(ctx: commands.Context):
             await ctx.send(embed=nextcord.Embed(description='Player is not `playing`!', color=embed_color))
         
 @commands.cooldown(1, 2, commands.BucketType.user)  
-@bot.command(name='skip', aliases=['next', 's'], help='skips to the next track', use = ',s')
+@bot.command(name='skip', aliases=['next', 's'], help='skips to the next track', description=',s')
 @commands.has_role('tm')
 async def skip_command(ctx: commands.Context):
     if await user_connectivity(ctx) == False:
