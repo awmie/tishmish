@@ -52,12 +52,9 @@ async def help(ctx, helpstr: Optional[str]):
             tm += f'`,{i.name}`' + ' '
         for j in member_cmds:
             mm += f'`,{j.name}`' + ' '
-        help_description = f'''{bot.description}\n\n**member commands**\n{mm}\n\n**tm commands**\n{tm}\n\n\nTo use tm-commands, server owner/admin can provide **tm** role to the member**(check ,setrole command)**\n
-        **For admin/owner:**\n
-        Server's **owner/admin** can create a role exactly named **tm** below **tishmish(role)** and can set this role for the members who would like to use those so called **tm commands**\n
-        (go to **server settings** > **Roles** > **create role** > set role name as **tm** and move it below **tishmish** role)\n\n'''
-        embed= nextcord.Embed(title="Tishmish Help", description=help_description, color=embed_color)
-        embed.set_footer(text='type **,help <command name>** for more information about that command')
+        help_description = f'{bot.description}\n\n**member commands**\n{mm}\n\n**tm commands**\n{tm}\n\n'
+        embed= nextcord.Embed(title="Tishmish Help", description=help_description,color=embed_color)
+        embed.add_field(name='type ,help <command name> for more information about that command',value='To use tm-commands, server owner/admin can provide **tm** role to the member\n[help](https://github.com/awmie/tishmish/blob/main/readme.md)')
         await ctx.send(embed=embed)
 
 # T I S H M I S H commands
@@ -573,4 +570,4 @@ async def save_command(ctx: commands.Context, savestr: Optional[str]):
 
 if __name__ == '__main__':
     bot.run(os.environ["tishmish_token"])
-    
+                 
