@@ -2,12 +2,12 @@
 import datetime, random
 import nextcord
 from nextcord.ext import commands
-import wavelink
-from wavelink.ext import spotify
+import nextwave
+from nextwave.ext import spotify
 from typing import Optional
 import os
 import numpy as np
-import lyricsgenius
+
 
 # I N T E N T S 
 intents = nextcord.Intents(messages = True, guilds = True)
@@ -24,7 +24,7 @@ bot = commands.Bot(command_prefix=',', intents = intents, description='Premium q
 global user_arr, user_dict
 user_dict = {} 
 user_arr = np.array([])
-setattr(wavelink.Player, 'lq', False)
+setattr(nextwave.Player, 'lq', False)
 embed_color = nextcord.Color.from_rgb(128, 67, 255)
 
 bot.remove_command('help')
@@ -78,7 +78,7 @@ async def ping_command(ctx):
     await ctx.send(embed=em)
 
 async def user_connectivity(ctx: commands.Context):
-    # vc: wavelink.Player = ctx.voice_client
+    # vc: nextwave.Player = ctx.voice_client
     if not getattr(ctx.author.voice, 'channel', None):
         await ctx.send(
             embed=nextcord.Embed(
@@ -95,14 +95,14 @@ async def on_ready():
     await bot.change_presence(activity=nextcord.Activity(type=nextcord.ActivityType.listening, name=",help"))
 
 @bot.event
-async def on_wavelink_node_ready(node: wavelink.Node):
+async def on_nextwave_node_ready(node: nextwave.Node):
     print(f'Node {node.identifier} connected successfully')
 
 async def node_connect():
     await bot.wait_until_ready()
-    await wavelink.NodePool.create_node(bot=bot, host='lavalink.lexnet.cc', port=443, password="lexn3tl@val!nk", https=True, spotify_client=spotify.SpotifyClient(client_id=os.environ['spotify_id'],client_secret=os.environ['spotify_secret']))
+    await nextwave.NodePool.create_node(bot=bot, host='lavalink.lexnet.cc', port=443, password="lexn3tl@val!nk", https=True, spotify_client=spotify.SpotifyClient(client_id=os.environ['spotify_id'],client_secret=os.environ['spotify_secret']))
 @bot.event
-async def on_wavelink_track_end(player: wavelink.Player, track: wavelink.Track, reason):
+async def on_nextwave_track_end(player: nextwave.Player, track: nextwave.Track, reason):
     ctx = player.ctx
     vc: player = ctx.voice_client
 
@@ -147,7 +147,7 @@ async def info_command(ctx: commands.Context):
 @bot.command(name='loopqueue', aliases=['lq'], help='starts the loop queue ==> ,lq start or ,lq enable\nstopes the loop queue ==> ,lq stop or ,lq disable', description=',lq <mode>')
 @commands.has_role('tm')
 async def loopqueue_command(ctx: commands.Context, type:str):
-    vc: wavelink.Player = ctx.voice_client
+    vc: nextwave.Player = ctx.voice_client
     if vc.queue.is_empty:
         return await ctx.send(embed=nextcord.Embed(description='Unable to loop `QUEUE`, try adding more songs..', color=embed_color))
     if vc.lq == False and type in {'start', 'enable'}:
@@ -171,7 +171,7 @@ async def loopqueue_command(ctx: commands.Context, type:str):
 
 @commands.cooldown(1, 1, commands.BucketType.user)
 @bot.command(name='play', aliases=['p'], help='plays the given track provided by the user', description=',p <song name>')
-async def play_command(ctx: commands.Context, *, search:wavelink.YouTubeTrack):
+async def play_command(ctx: commands.Context, *, search:nextwave.YouTubeTrack):
     
     if not getattr(ctx.author.voice, 'channel', None):
         return await ctx.send(
@@ -181,9 +181,9 @@ async def play_command(ctx: commands.Context, *, search:wavelink.YouTubeTrack):
             )
         )
     elif not ctx.voice_client:
-        vc: wavelink.Player = await ctx.author.voice.channel.connect(cls=wavelink.Player)
+        vc: nextwave.Player = await ctx.author.voice.channel.connect(cls=nextwave.Player)
     else:
-        vc: wavelink.Player = ctx.voice_client
+        vc: nextwave.Player = ctx.voice_client
 
     if vc.queue.is_empty and vc.is_playing() is False:   
         playString = await ctx.send(embed=nextcord.Embed(description='**searching...**', color=embed_color))
@@ -212,16 +212,16 @@ async def spotifyplay_command(ctx: commands.Context, search: str):
             )
         )
     elif not ctx.voice_client:
-        vc: wavelink.Player = await ctx.author.voice.channel.connect(cls=wavelink.Player)
+        vc: nextwave.Player = await ctx.author.voice.channel.connect(cls=nextwave.Player)
     else:
-        vc: wavelink.Player = ctx.voice_client
+        vc: nextwave.Player = ctx.voice_client
 
     async for partial in spotify.SpotifyTrack.iterator(query=search, type=spotify.SpotifySearchType.playlist, partial_tracks=True):
         if vc.queue.is_empty and vc.is_playing() is False:
             await vc.play(partial)
         else:
             await vc.queue.put_wait(partial)
-        song_name = await wavelink.tracks.YouTubeTrack.search(partial.title)
+        song_name = await nextwave.tracks.YouTubeTrack.search(partial.title)
         user_dict[song_name[0].identifier] = ctx.author.mention 
 
     vc.ctx = ctx 
@@ -233,7 +233,7 @@ async def spotifyplay_command(ctx: commands.Context, search: str):
 async def pause_command(ctx: commands.Context):
     if await user_connectivity(ctx) == False:
         return
-    vc: wavelink.Player = ctx.voice_client
+    vc: nextwave.Player = ctx.voice_client
 
     if vc._source:
         if not vc.is_paused():
@@ -250,7 +250,7 @@ async def pause_command(ctx: commands.Context):
 async def resume_command(ctx: commands.Context):
     if await user_connectivity(ctx) == False:
         return
-    vc: wavelink.Player = ctx.voice_client
+    vc: nextwave.Player = ctx.voice_client
 
     if vc.is_playing():
         if vc.is_paused():
@@ -268,7 +268,7 @@ async def resume_command(ctx: commands.Context):
 async def skip_command(ctx: commands.Context):
     if await user_connectivity(ctx) == False:
         return
-    vc: wavelink.Player = ctx.voice_client
+    vc: nextwave.Player = ctx.voice_client
 
     if vc.loop == True:
         vclooptxt = 'Disable the `LOOP` to skip | **,loop** again to disable the `LOOP` | Add a new song to disable the `LOOP`'
@@ -298,7 +298,7 @@ async def skip_command(ctx: commands.Context):
 async def disconnect_command(ctx: commands.Context):
     if await user_connectivity(ctx) == False:
         return
-    vc : wavelink.Player = ctx.voice_client
+    vc : nextwave.Player = ctx.voice_client
     try:
         await vc.disconnect(force=True)
         await ctx.send(embed=nextcord.Embed(description='**BYE!** Have a great time!', color=embed_color))
@@ -310,7 +310,7 @@ async def disconnect_command(ctx: commands.Context):
 async def nowplaying_command(ctx: commands.Context):
     if await user_connectivity(ctx) == False:
         return
-    vc: wavelink.Player = ctx.voice_client
+    vc: nextwave.Player = ctx.voice_client
     if not vc.is_playing():
         return await ctx.send(embed=nextcord.Embed(description='Not playing anything!', color=embed_color))
 
@@ -339,7 +339,7 @@ async def nowplaying_command(ctx: commands.Context):
 async def loop_command(ctx: commands.Context):
     if await user_connectivity(ctx) == False:
         return
-    vc: wavelink.Player = ctx.voice_client
+    vc: nextwave.Player = ctx.voice_client
     if not vc._source:
         return await ctx.send(embed= nextcord.Embed(description='No song to `loop`', color=embed_color))
     try:
@@ -365,7 +365,7 @@ async def loop_command(ctx: commands.Context):
 async def queue_command(ctx: commands.Context):
     if await user_connectivity(ctx) == False:
         return
-    vc: wavelink.Player = ctx.voice_client
+    vc: nextwave.Player = ctx.voice_client
 
     if vc.queue.is_empty:
         return await ctx.send(embed= nextcord.Embed(description='**QUEUE**\n\n`empty`', color=embed_color))
@@ -376,7 +376,7 @@ async def queue_command(ctx: commands.Context):
     global song_count, song, song_queue
     song_queue = vc.queue.copy()
     for song_count, song in enumerate(song_queue, start=1):
-        title = song.title if wavelink.tracks.PartialTrack else song.info['title']
+        title = song.title if nextwave.tracks.PartialTrack else song.info['title']
         qem.add_field(name='‎', value=f'**{song_count} **• {title}', inline=False)
 
     await ctx.send(embed=qem)
@@ -388,7 +388,7 @@ async def queue_command(ctx: commands.Context):
 async def shuffle_command(ctx: commands.Context):
     if await user_connectivity(ctx) == False:
         return
-    vc: wavelink.Player = ctx.voice_client
+    vc: nextwave.Player = ctx.voice_client
     if song_count > 2:
         random.shuffle(vc.queue._queue)
         return await ctx.send(
@@ -416,7 +416,7 @@ async def shuffle_command(ctx: commands.Context):
 async def del_command(ctx: commands.Context, position: int):
     if await user_connectivity(ctx) == False:
         return
-    vc: wavelink.Player = ctx.voice_client
+    vc: nextwave.Player = ctx.voice_client
     if vc.queue.is_empty:
         return await ctx.send(embed=nextcord.Embed(description='No songs in the `QUEUE`', color=embed_color))
     if position <= 0:
@@ -439,7 +439,7 @@ async def del_command(ctx: commands.Context, position: int):
 async def skipto_command(ctx: commands.Context, position: int):
     if await user_connectivity(ctx) == False:
         return
-    vc: wavelink.Player = ctx.voice_client
+    vc: nextwave.Player = ctx.voice_client
     if vc.queue.is_empty:
         return await ctx.send(embed=nextcord.Embed(description='No songs in the `QUEUE`', color=embed_color))
     if position <= 0:
@@ -464,7 +464,7 @@ async def skipto_command(ctx: commands.Context, position: int):
 async def move_command(ctx: commands.Context, song_position: int, move_position: int):
     if await user_connectivity(ctx) == False:
         return
-    vc: wavelink.Player = ctx.voice_client
+    vc: nextwave.Player = ctx.voice_client
     if vc.queue.is_empty:
         return await ctx.send(embed=nextcord.Embed(description='No songs in the `QUEUE`!', color=embed_color))
     if song_position <= 0 or move_position <= 0:
@@ -494,7 +494,7 @@ async def move_command(ctx: commands.Context, song_position: int, move_position:
 async def volume_command(ctx: commands.Context, playervolume: int):
     if await user_connectivity(ctx) == False:
         return
-    vc: wavelink.Player = ctx.voice_client
+    vc: nextwave.Player = ctx.voice_client
     if vc.is_connected():
         if playervolume > 100:
             return await ctx.send(embed= nextcord.Embed(description='**VOLUME** supported upto `100%`', color=embed_color))
@@ -512,7 +512,7 @@ async def volume_command(ctx: commands.Context, playervolume: int):
 async def seek_command(ctx: commands.Context, seekPosition: int):
     if await user_connectivity(ctx) == False:
         return
-    vc: wavelink.Player = ctx.voice_client
+    vc: nextwave.Player = ctx.voice_client
     if not vc.is_playing():
         return await ctx.send(embed=nextcord.Embed(description='Player not playing!', color=embed_color))
     elif vc.is_playing():
@@ -526,7 +526,7 @@ async def seek_command(ctx: commands.Context, seekPosition: int):
 @bot.command(name='clear',aliases=[], help='clears the queue', description=',clear')
 @commands.has_role('tm')
 async def clear_command(ctx: commands.Context):
-    vc: wavelink.Player = ctx.voice_client
+    vc: nextwave.Player = ctx.voice_client
     if await user_connectivity(ctx) == False:
         return
     if vc.queue.is_empty:
@@ -541,7 +541,7 @@ async def clear_command(ctx: commands.Context):
 @commands.cooldown(1, 2, commands.BucketType.user)
 @bot.command(name='save', aliases=['dm'], description=",save\n,save <song number | 'queue' | 'q'>", help='dms the current | specified song to the user')
 async def save_command(ctx: commands.Context, savestr: Optional[str]):
-    vc: wavelink.Player = ctx.voice_client
+    vc: nextwave.Player = ctx.voice_client
     if await user_connectivity(ctx) == False:
         return
     user = await bot.fetch_user(ctx.author._user.id)
@@ -567,70 +567,6 @@ async def save_command(ctx: commands.Context, savestr: Optional[str]):
         return await ctx.send(embed=nextcord.Embed(description='There is no `song` | `queue` available', color=embed_color))
         
         
-# @commands.cooldown(1,2, commands.BucketType.user)
-# @bot.command(name='lyrics', aliases=['l'], description=",lyrics | ,l", help='searches the lyrics for current song being played')
-# async def lyrics_command(ctx: commands.Context):
-#     vc: wavelink.Player = ctx.voice_client
-#     if await user_connectivity(ctx) == False:
-#         return
-#     genius = lyricsgenius.Genius(access_token=os.environ['lyrics_token'])
-#     songstr = vc.track.title
-#     searchmssg = await ctx.send(embed=nextcord.Embed(description=f'**searching the lyrics for {vc.track.title}...**', color = embed_color))
-#     if '(' in songstr:
-#         song = songstr.split(' - ')[1].split('(')[0]
-#         author = songstr.split(' - ')[0]
-#     elif '[' in songstr:
-#         song = songstr.split(' - ')[1].split('[')[0]
-#         author = songstr.split(' - ')[0]
-#     elif '|' in songstr:
-#         song = songstr.split(' - ')[1]
-#         author = songstr.split(' - ')[0]
-#     else:
-#         song = songstr
-#         author = vc.track.author
-#     # genius.verbose = False # Turn off status messages
-#     genius.remove_section_headers = True
-#     songvalue = genius.search_song(song, author)
-#     mylyrics = [songvalue.lyrics]
-#     if mylyrics is None:
-#         await searchmssg.edit(embed=nextcord.Embed(description='**No lyrics found!**', color=embed_color))
-
-#     else:
-#         for i in mylyrics:
-#             await ctx.send(embed=nextcord.Embed(description=f'{i}', color=embed_color))
-#             await searchmssg.edit(embed=nextcord.Embed(description='**Search found!**', color=embed_color))
-
-# import requests
-# from bs4 import BeautifulSoup
-
-# @commands.cooldown(1,2, commands.BucketType.user)
-# @bot.command(name='lyrics', aliases=['l'], description=",lyrics | ,l", help='searches the lyrics for current song being played')
-# async def lyrics_command(ctx: commands.Context):
-#     vc: wavelink.Player = ctx.voice_client
-#     if await user_connectivity(ctx) == False:
-#         return
-# def get_lyrics(artist, title):
-#     # Format the artist and title strings for the URL
-#     artist = artist.lower().replace(" ", "-")
-#     title = title.lower().replace(" ", "-")
-#     url = f"https://www.lyrics.com/lyrics/{title}/{artist}"
-
-#     # Send a GET request to the URL
-#     response = requests.get(url)
-
-#     # Parse the HTML using BeautifulSoup
-#     soup = BeautifulSoup(response.text, 'html.parser')
-
-#     # Find the div element that contains the lyrics
-#     lyrics_div = soup.find('div', {'class': 'lyrics'})
-
-#     # If lyrics_div is None, the song was not found
-#     if lyrics_div is None:
-#         return "Lyrics not found"
-
-#     return lyrics_div.get_text(strip=True)
-
-
 '''main'''
 
 if __name__ == '__main__':
