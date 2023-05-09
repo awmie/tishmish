@@ -101,7 +101,7 @@ async def on_nextwave_node_ready(node: nextwave.Node):
 
 async def node_connect():
     await bot.wait_until_ready()
-    await nextwave.NodePool.create_node(bot=bot, host='lavalink.devamop.in', port=443, password="DevamOP", https=True, spotify_client=spotify.SpotifyClient(client_id=os.environ['spotify_id'],client_secret=os.environ['spotify_secret']))
+    await nextwave.NodePool.create_node(bot=bot, host=os.environ['Host'], port=os.environ['Port'], password=os.environ['Password'], https=True, spotify_client=spotify.SpotifyClient(client_id=os.environ['spotify_id'],client_secret=os.environ['spotify_secret']))
 @bot.event
 async def on_nextwave_track_end(player: nextwave.Player, track: nextwave.Track, reason):
     ctx = player.ctx
