@@ -7,6 +7,7 @@ from nextwave.ext import spotify
 from typing import Optional
 import os
 import numpy as np
+from nextcord import HTTPException
 
 
 # I N T E N T S 
@@ -203,7 +204,7 @@ async def play_command(ctx: commands.Context, *, search:nextwave.YouTubeTrack):
 @commands.cooldown(1, 1, commands.BucketType.user)
 @bot.command(name='splay', aliases=['sp'], help='plays the provided spotify playlist link', description=',sp <spotify playlist link>')
 async def spotifyplay_command(ctx: commands.Context, search: str):
-   
+
     if not getattr(ctx.author.voice, 'channel', None):
         return await ctx.send(
             embed=nextcord.Embed(
@@ -211,22 +212,28 @@ async def spotifyplay_command(ctx: commands.Context, search: str):
                 color=embed_color,
             )
         )
-    elif not ctx.voice_client:
-        vc: nextwave.Player = await ctx.author.voice.channel.connect(cls=nextwave.Player)
-    else:
-        vc: nextwave.Player = ctx.voice_client
 
-    async for partial in spotify.SpotifyTrack.iterator(query=search, type=spotify.SpotifySearchType.playlist, partial_tracks=True):
-        if vc.queue.is_empty and vc.is_playing() is False:
-            await vc.play(partial)
+    vc: nextwave.Player = (
+        ctx.voice_client or await ctx.author.voice.channel.connect(cls=nextwave.Player)
+    )
+    try:
+        async for partial in spotify.SpotifyTrack.iterator(query=search, type=spotify.SpotifySearchType.playlist, partial_tracks=True):
+            if vc.queue.is_empty and vc.is_playing() is False:
+                await vc.play(partial)
+            else:
+                await vc.queue.put_wait(partial)
+            song_name = await nextwave.tracks.YouTubeTrack.search(partial.title)
+            user_dict[song_name[0].identifier] = ctx.author.mention
+
+        vc.ctx = ctx
+        setattr(vc, 'loop', False)
+
+    except HTTPException as e:
+        if e.status == 400:
+            await ctx.send(embed=nextcord.Embed(description='Error: Invalid playlist URL or ID', color=embed_color))
         else:
-            await vc.queue.put_wait(partial)
-        song_name = await nextwave.tracks.YouTubeTrack.search(partial.title)
-        user_dict[song_name[0].identifier] = ctx.author.mention 
+            raise e
 
-    vc.ctx = ctx 
-
-    setattr(vc, 'loop', False)
              
 @commands.cooldown(1, 2, commands.BucketType.user)
 @bot.command(name='pause', aliases=['stop'], help='pauses the current playing track', description=',pause')
@@ -329,7 +336,7 @@ async def nowplaying_command(ctx: commands.Context):
     nowplaying_description = f'[`{vc.track.title}`]({str(vc.track.uri)})\n\n**Requested by**: {requester}'
     em = nextcord.Embed(description=f'**Now Playing**\n\n{nowplaying_description}', color=embed_color)
     em.add_field(name='**Song Info**', value=f'• Author: `{vc.track.author}`\n• Duration: `{str(datetime.timedelta(seconds=vc.track.length))}`')
-    em.add_field(name='**Player Info**', value=f'• Player Volume: `{vc._volume}`\n• Loop: `{loopstr}`\n• Current State: `{state}`', inline=False)
+    em.add_field(name='**Player Info**', value=f'• Player Volume: `{vc.volume}`\n• Loop: `{loopstr}`\n• Current State: `{state}`', inline=False)
 
     return await ctx.send(embed=em)
 
@@ -474,19 +481,23 @@ async def move_command(ctx: commands.Context, song_position: int, move_position:
                 color=embed_color,
             )
         )
-    elif song_position > song_count or move_position > song_count:
-        position = song_position if song_position > song_count else move_position
+        
+    queue_length = len(vc.queue)
+    if song_position > queue_length or move_position > queue_length:
+        position = song_position if song_position > queue_length else move_position
         return await ctx.send(embed=nextcord.Embed(description=f'Position `{position}` is outta range!', color=embed_color))
     elif song_position == move_position:
         return await ctx.send(embed=nextcord.Embed(description=f'Already in that `Position`:{move_position}', color=embed_color))
     else:
-        move_index = move_position-1 if move_position < song_position else move_position
-        song_index = song_position if move_position < song_position else song_position-1
-        vc.queue.put_at_index(move_index, vc.queue._queue[song_position-1])
-        moved_song = vc.queue._queue[song_index]
-        del vc.queue._queue[song_index]
-        moved_song_name = moved_song.info['title']
+        move_index = move_position - 1 if song_position < move_position else move_position
+        song_index = song_position - 1 if song_position < move_position else song_position
+        move_song = vc.queue._queue[song_index]
+        vc.queue._queue.remove(move_song)
+        vc.queue.put_at_index(move_index, move_song)
+
+        moved_song_name = move_song.title
         return await ctx.send(embed=nextcord.Embed(description=f'**{moved_song_name}** moved at Position:`{move_position}`', color=embed_color))
+
 
 @commands.cooldown(1, 2, commands.BucketType.user)
 @bot.command(name='volume',aliases=['vol'], help='sets the volume', description=',vol <number>')
