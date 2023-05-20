@@ -505,33 +505,29 @@ async def del_command(ctx: commands.Context, position: int):
         return await ctx.send(embed=nextcord.Embed(description=f'`{SongToBeDeleted}` removed from the QUEUE', color=embed_color))
 
 @commands.cooldown(1, 2, commands.BucketType.user)
-@bot.command(name='skipto', aliases=['goto'], help='skips to the specified track', description=',skipto <song number>')
+@bot.command(name='skipto',aliases=['goto'], help='skips to the specified track', description=',skipto <song number>')
 @commands.has_role('tm')
 async def skipto_command(ctx: commands.Context, position: int):
-    if not await user_connectivity(ctx):
+    if await user_connectivity(ctx) == False:
         return
-
     vc: nextwave.Player = ctx.voice_client
-    if vc.queue.is_empty():
+    if vc.queue.is_empty:
         return await ctx.send(embed=nextcord.Embed(description='No songs in the `QUEUE`', color=embed_color))
-
-    if position <= 0 or position > vc.queue.qsize():
-        return await ctx.send(embed=nextcord.Embed(description=f'Invalid position: {position}', color=embed_color))
-
-    if position == 1:
-        # If the position is already the first track, use the skip command directly
+    if position <= 0:
+        return await ctx.send(
+            embed=nextcord.Embed(
+                description='Position can not be `ZERO`* or `LESSER`',
+                color=embed_color,
+            )
+        )
+    elif position > song_count:
+        return await ctx.send(embed=nextcord.Embed(description=f'Position `{position}` is outta range', color=embed_color))
+    elif position == vc.queue._queue[position-1]:
+        return await ctx.send(embed=nextcord.Embed(description='Already in that `Position`!', color=embed_color))
+    else:
+        vc.queue.put_at_front(vc.queue._queue[position-1])
+        del vc.queue._queue[position]    
         return await skip_command(ctx)
-
-    # Get the track at the specified position
-    track = vc.queue._queue[position - 1]
-
-    # Move the track to the front of the queue
-    vc.queue._queue.remove(track)
-    vc.queue._queue.insert(0, track)
-
-    # Skip the current track
-    return await skip_command(ctx)
-
 
 @commands.cooldown(1, 2, commands.BucketType.user)
 @bot.command(name='move', aliases=['set'], help='moves the track to the specified position', description=',move <song number> <position>')
