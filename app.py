@@ -140,7 +140,7 @@ async def on_nextwave_track_end(player: nextwave.Player, track: nextwave.Track, 
                 description='No songs in the `QUEUE`', color=embed_color
             )
         )
-
+        
 @bot.event
 async def on_voice_state_update(member, before, after):
     # Check if the bot's voice state has changed
@@ -148,10 +148,11 @@ async def on_voice_state_update(member, before, after):
         voice_client = nextcord.utils.get(bot.voice_clients, guild=before.channel.guild)
         if voice_client is not None:
             # Get the player associated with the voice client
-            player = get_player(voice_client.guild.id)
-            if player is not None:
-                # Clear the queue for the player
-                player.queue.clear()
+            if voice_client.guild is not None:
+                player = get_player(voice_client.guild.id)
+                if player is not None:
+                    # Clear the queue for the player
+                    player.queue.clear()
 
             # Disconnect the voice client
             await voice_client.disconnect()
@@ -161,10 +162,11 @@ async def on_voice_state_update(member, before, after):
         for vc in bot.voice_clients:
             if vc.channel == before.channel:
                 # Get the player associated with the voice client
-                player = get_player(vc.guild.id)
-                if player is not None:
-                    # Clear the queue for the player
-                    player.queue.clear()
+                if vc.guild is not None:
+                    player = get_player(vc.guild.id)
+                    if player is not None:
+                        # Clear the queue for the player
+                        player.queue.clear()
 
                 # Disconnect the voice client
                 await vc.disconnect(force=True)
