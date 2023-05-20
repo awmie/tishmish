@@ -8,6 +8,7 @@ from typing import Optional
 import os
 import numpy as np
 from nextcord import HTTPException
+from nextwave import Player
 
 
 # I N T E N T S 
@@ -22,6 +23,18 @@ all_intents= True
 
 bot = commands.Bot(command_prefix=',', intents = intents, description='Premium quality music bot for free!\nUse headphones for better quality <3')
 # some useful variables
+players = {}
+
+def get_player(guild_id):
+    # Check if a player instance already exists for the guild
+    if guild_id in players:
+        return players[guild_id]
+    
+    # Create a new player instance for the guild
+    player = Player()
+    players[guild_id] = player
+    return player
+
 global user_arr, user_dict
 user_dict = {} 
 user_arr = np.array([])
@@ -29,7 +42,7 @@ setattr(nextwave.Player, 'lq', False)
 embed_color = nextcord.Color.from_rgb(128, 67, 255)
 
 bot.remove_command('help')
-   
+  
 # T I S M I S H help-command
 @bot.group(invoke_without_command= True)
 async def help(ctx, helpstr: Optional[str]):
@@ -102,10 +115,12 @@ async def on_nextwave_node_ready(node: nextwave.Node):
 async def node_connect():
     await bot.wait_until_ready()
     await nextwave.NodePool.create_node(bot=bot, host=os.environ['Host'], port=os.environ['Port'], password=os.environ['Password'], https=True, spotify_client=spotify.SpotifyClient(client_id=os.environ['spotify_id'],client_secret=os.environ['spotify_secret']))
+
+
 @bot.event
 async def on_nextwave_track_end(player: nextwave.Player, track: nextwave.Track, reason):
     ctx = player.ctx
-    vc: player = ctx.voice_client
+    vc = ctx.voice_client
 
     if vc.loop:
         return await vc.play(track)
@@ -117,7 +132,7 @@ async def on_nextwave_track_end(player: nextwave.Player, track: nextwave.Track, 
             next_song = vc.queue.get()
             await vc.play(next_song)
             await ctx.send(embed=nextcord.Embed(description=f'**Current song playing from the `QUEUE`**\n\n`{next_song.title}`', color=embed_color), delete_after=30)
-            #{code to remove the song name from the numpy array}
+            
     except Exception:
         await vc.stop()
         return await ctx.send(
@@ -125,6 +140,35 @@ async def on_nextwave_track_end(player: nextwave.Player, track: nextwave.Track, 
                 description='No songs in the `QUEUE`', color=embed_color
             )
         )
+
+@bot.event
+async def on_voice_state_update(member, before, after):
+    # Check if the bot's voice state has changed
+    if member.id == bot.user.id and before.channel != after.channel and (before.channel is not None and after.channel is None):
+        voice_client = nextcord.utils.get(bot.voice_clients, guild=before.channel.guild)
+        if voice_client is not None:
+            # Get the player associated with the voice client
+            player = get_player(voice_client.guild.id)
+            if player is not None:
+                # Clear the queue for the player
+                player.queue.clear()
+
+            # Disconnect the voice client
+            await voice_client.disconnect()
+
+    # Auto-disconnect if all participants leave the voice channel
+    if before.channel is not None and bot.user in before.channel.members and len(before.channel.members) == 1:
+        for vc in bot.voice_clients:
+            if vc.channel == before.channel:
+                # Get the player associated with the voice client
+                player = get_player(vc.guild.id)
+                if player is not None:
+                    # Clear the queue for the player
+                    player.queue.clear()
+
+                # Disconnect the voice client
+                await vc.disconnect(force=True)
+                break
 
 @bot.event
 async def on_command_error(ctx: commands.Context, error):
@@ -322,19 +366,6 @@ async def disconnect_command(ctx: commands.Context):
     except Exception:
         await ctx.send(embed=nextcord.Embed(description='Failed to destroy!', color=embed_color))
 
-@bot.event
-async def on_voice_state_update(member, before, after):
-    # Check if the bot's voice state has changed
-    if member.id == bot.user.id and before.channel != after.channel and (before.channel is not None and after.channel is None):
-        voice_client = nextcord.utils.get(bot.voice_clients, guild=before.channel.guild)
-        if voice_client is not None:
-            await voice_client.disconnect()
-    # Auto-disconnect if all participants leave the voice channel
-    if before.channel is not None and bot.user in before.channel.members and len(before.channel.members) == 1:
-        for vc in bot.voice_clients:
-            if vc.channel == before.channel:
-                await vc.disconnect(force=True)
-                break         
 
 @commands.cooldown(1, 2, commands.BucketType.user)
 @bot.command(name='nowplaying', aliases=['np'], help='shows the current track information', description=',np')
