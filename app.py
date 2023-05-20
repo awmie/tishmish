@@ -322,10 +322,12 @@ async def disconnect_command(ctx: commands.Context):
     except Exception:
         await ctx.send(embed=nextcord.Embed(description='Failed to destroy!', color=embed_color))
 
-
-# Auto-disconnect if all participants leave the voice channel
 @bot.event
 async def on_voice_state_update(member, before, after):
+    # Check if the bot's voice state has changed
+    if member.id == bot.user.id and before.channel != after.channel and (before.channel is not None and after.channel is None):
+        await before.channel.disconnect()
+    # Auto-disconnect if all participants leave the voice channel
     if before.channel is not None and bot.user in before.channel.members and len(before.channel.members) == 1:
         for vc in bot.voice_clients:
             if vc.channel == before.channel:
