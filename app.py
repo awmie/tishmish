@@ -20,7 +20,7 @@ intents.emojis_and_stickers = True
 all_intents = intents.all()
 all_intents= True
 
-bot = commands.Bot(command_prefix='-', intents = intents, description='Premium quality music bot for free!\nUse headphones for better quality <3')
+bot = commands.Bot(command_prefix=',', intents = intents, description='Premium quality music bot for free!\nUse headphones for better quality <3')
 # some useful variables
 global user_arr, user_dict
 user_dict = {} 
@@ -217,7 +217,6 @@ async def spotifyplay_command(ctx: commands.Context, search: str):
         ctx.voice_client or await ctx.author.voice.channel.connect(cls=nextwave.Player)
     )
     try:
-        count = 0
         # Initialize the embed before the loop
         queue_embed = nextcord.Embed(
             description='**Loading QUEUE...**',
@@ -231,11 +230,11 @@ async def spotifyplay_command(ctx: commands.Context, search: str):
                 await vc.queue.put_wait(partial)
             song_name = await nextwave.tracks.YouTubeTrack.search(partial.title)
             user_dict[song_name[0].identifier] = ctx.author.mention
-            count += 1
             # Update the description of the embed with the current count
-            queue_embed.description = f'please wait a little Loading QUEUE...**{count}**'
+            queue_embed.description = f'Please wait! adding songs..\n**Track No.{vc.queue.__len__()} added** to the **QUEUE**'
             await queueCompletion.edit(embed=queue_embed)
-            
+        await queueCompletion.delete(delay=5)
+        await ctx.send(embed=nextcord.Embed(description='All Songs added Successfully! <3', color=embed_color))
         vc.ctx = ctx
         setattr(vc, 'loop', False)
 
@@ -322,7 +321,7 @@ async def disconnect_command(ctx: commands.Context):
         await ctx.send(embed=nextcord.Embed(description='**BYE!** Have a great time!', color=embed_color))
     except Exception:
         await ctx.send(embed=nextcord.Embed(description='Failed to destroy!', color=embed_color))
-            
+
 @commands.cooldown(1, 2, commands.BucketType.user)
 @bot.command(name='nowplaying', aliases=['np'], help='shows the current track information', description=',np')
 async def nowplaying_command(ctx: commands.Context):
