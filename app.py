@@ -326,7 +326,9 @@ async def disconnect_command(ctx: commands.Context):
 async def on_voice_state_update(member, before, after):
     # Check if the bot's voice state has changed
     if member.id == bot.user.id and before.channel != after.channel and (before.channel is not None and after.channel is None):
-        await before.channel.disconnect()
+        voice_client = nextcord.utils.get(bot.voice_clients, guild=before.channel.guild)
+        if voice_client is not None:
+            await voice_client.disconnect()
     # Auto-disconnect if all participants leave the voice channel
     if before.channel is not None and bot.user in before.channel.members and len(before.channel.members) == 1:
         for vc in bot.voice_clients:
