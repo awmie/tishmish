@@ -140,7 +140,7 @@ async def on_command_error(ctx: commands.Context, error):
 @commands.cooldown(1, 2, commands.BucketType.user)
 @bot.command(name='info',aliases=['i'], help='shows information about the bot')
 @commands.is_owner()
-@commands.has_role('tm')
+# @commands.has_role('tm')
 async def info_command(ctx: commands.Context):
     await ctx.send(embed=nextcord.Embed(description=f'**Info**\ntotal server count: `{len(bot.guilds)}`', color=embed_color))
     
@@ -217,6 +217,12 @@ async def spotifyplay_command(ctx: commands.Context, search: str):
         ctx.voice_client or await ctx.author.voice.channel.connect(cls=nextwave.Player)
     )
     try:
+        # Initialize the embed before the loop
+        queue_embed = nextcord.Embed(
+            description='**Loading QUEUE...**',
+            color=embed_color
+        )
+        queueCompletion = await ctx.send(embed=queue_embed)
         async for partial in spotify.SpotifyTrack.iterator(query=search, type=spotify.SpotifySearchType.playlist, partial_tracks=True):
             if vc.queue.is_empty and vc.is_playing() is False:
                 await vc.play(partial)
@@ -224,16 +230,20 @@ async def spotifyplay_command(ctx: commands.Context, search: str):
                 await vc.queue.put_wait(partial)
             song_name = await nextwave.tracks.YouTubeTrack.search(partial.title)
             user_dict[song_name[0].identifier] = ctx.author.mention
-
+            # Update the description of the embed with the current count
+            queue_embed.description = f'Please wait! adding songs..\n**Track No.{vc.queue.__len__()} added** to the **QUEUE**'
+            await queueCompletion.edit(embed=queue_embed)
+        await queueCompletion.delete(delay=5)
+        await ctx.send(embed=nextcord.Embed(description='All Songs added Successfully! <3', color=embed_color))
         vc.ctx = ctx
         setattr(vc, 'loop', False)
+
 
     except HTTPException as e:
         if e.status == 400:
             await ctx.send(embed=nextcord.Embed(description='Error: Invalid playlist URL or ID', color=embed_color))
         else:
             raise e
-
              
 @commands.cooldown(1, 2, commands.BucketType.user)
 @bot.command(name='pause', aliases=['stop'], help='pauses the current playing track', description=',pause')
@@ -312,17 +322,16 @@ async def disconnect_command(ctx: commands.Context):
     except Exception:
         await ctx.send(embed=nextcord.Embed(description='Failed to destroy!', color=embed_color))
 
+
 # Auto-disconnect if all participants leave the voice channel
 @bot.event
 async def on_voice_state_update(member, before, after):
-    if before.channel is not None:
-        if bot.user in before.channel.members:
-            if len(before.channel.members) == 1:
-                for vc in bot.voice_clients:
-                    if vc.channel == before.channel:
-                        await vc.disconnect(force=True)
-                        break         
-         
+    if before.channel is not None and bot.user in before.channel.members and len(before.channel.members) == 1:
+        for vc in bot.voice_clients:
+            if vc.channel == before.channel:
+                await vc.disconnect(force=True)
+                break         
+
 @commands.cooldown(1, 2, commands.BucketType.user)
 @bot.command(name='nowplaying', aliases=['np'], help='shows the current track information', description=',np')
 async def nowplaying_command(ctx: commands.Context):
