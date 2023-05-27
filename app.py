@@ -186,7 +186,7 @@ async def on_command_error(ctx: commands.Context, error):
 @commands.cooldown(1, 2, commands.BucketType.user)
 @bot.command(name='info',aliases=['i'], help='shows information about the bot')
 @commands.is_owner()
-# @commands.has_role('tm')
+@commands.has_role('tm')
 async def info_command(ctx: commands.Context):
     await ctx.send(embed=nextcord.Embed(description=f'**Info**\ntotal server count: `{len(bot.guilds)}`', color=embed_color))
     
@@ -264,6 +264,7 @@ async def spotifyplay_command(ctx: commands.Context, search: str):
     )
 
     try:
+        count = 0
         # Initialize the embed before the loop
         queue_embed = nextcord.Embed(
             description='**Loading QUEUE...**',
@@ -271,23 +272,17 @@ async def spotifyplay_command(ctx: commands.Context, search: str):
         )
         queueCompletion = await ctx.send(embed=queue_embed)
         async for partial in spotify.SpotifyTrack.iterator(query=search, type=spotify.SpotifySearchType.playlist, partial_tracks=True):
-            if vc.is_connected():
-                if vc.queue.is_empty and vc.is_playing() is False:
-                    await vc.play(partial)
-                else:
-                    await vc.queue.put_wait(partial)
-                song_name = await nextwave.tracks.YouTubeTrack.search(partial.title)
-                user_dict[song_name[0].identifier] = ctx.author.mention
-                # Update the description of the embed with the current count
-                queue_embed.description = f'Please wait! adding songs..\n**Track No.{vc.queue.__len__()} added** to the **QUEUE**'
-                await queueCompletion.edit(embed=queue_embed)
+            if vc.queue.is_empty and vc.is_playing() is False:
+                await vc.play(partial)
             else:
-                # Stop adding songs if the bot is disconnected
-                await queueCompletion.edit(embed=nextcord.Embed(description='Failed to add songs. Bot disconnected.', color=embed_color))
-                return
-
-        await queueCompletion.delete(delay=5)
-        await ctx.send(embed=nextcord.Embed(description='All Songs added Successfully! <3', color=embed_color))
+                await vc.queue.put_wait(partial)
+            song_name = await nextwave.tracks.YouTubeTrack.search(partial.title)
+            user_dict[song_name[0].identifier] = ctx.author.mention
+            count += 1
+            # Update the description of the embed with the current count
+            queue_embed.description = f'please wait a little Loading QUEUE...**{count}**'
+            await queueCompletion.edit(embed=queue_embed)
+            
         vc.ctx = ctx
         setattr(vc, 'loop', False)
 
