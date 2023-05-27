@@ -369,12 +369,7 @@ async def disconnect_command(ctx: commands.Context):
         await ctx.send(embed=nextcord.Embed(description='**BYE!** Have a great time!', color=embed_color))
     except Exception:
         await ctx.send(embed=nextcord.Embed(description='Failed to destroy!', color=embed_color))
-<<<<<<< HEAD
 
-
-=======
-            
->>>>>>> parent of b852655 (Added auto-disconnect if voice channel empty)
 @commands.cooldown(1, 2, commands.BucketType.user)
 @bot.command(name='nowplaying', aliases=['np'], help='shows the current track information', description=',np')
 async def nowplaying_command(ctx: commands.Context):
