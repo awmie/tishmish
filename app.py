@@ -621,4 +621,3 @@ async def save_command(ctx: commands.Context, savestr: Optional[str]):
 
 if __name__ == '__main__':
     bot.run(os.environ["tishmish_token"])
-                 
