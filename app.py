@@ -340,6 +340,17 @@ async def disconnect_command(ctx: commands.Context):
     except Exception:
         await ctx.send(embed=nextcord.Embed(description='Failed to destroy!', color=embed_color))
 
+# Auto-disconnect if all participants leave the voice channel
+@bot.event
+async def on_voice_state_update(member, before, after):
+    if before.channel is not None:
+        if bot.user in before.channel.members:
+            if len(before.channel.members) == 1:
+                for vc in bot.voice_clients:
+                    if vc.channel == before.channel:
+                        await vc.disconnect(force=True)
+                        break         
+         
 @commands.cooldown(1, 2, commands.BucketType.user)
 @bot.command(name='nowplaying', aliases=['np'], help='shows the current track information', description=',np')
 async def nowplaying_command(ctx: commands.Context):
