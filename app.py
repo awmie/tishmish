@@ -518,7 +518,7 @@ async def move_command(ctx: commands.Context, song_position: int, move_position:
                 color=embed_color,
             )
         )
-        
+
     queue_length = len(vc.queue)
     if song_position > queue_length or move_position > queue_length:
         position = song_position if song_position > queue_length else move_position
@@ -526,10 +526,9 @@ async def move_command(ctx: commands.Context, song_position: int, move_position:
     elif song_position == move_position:
         return await ctx.send(embed=nextcord.Embed(description=f'Already in that `Position`:{move_position}', color=embed_color))
     else:
-        move_index = move_position - 1 if song_position < move_position else move_position
-        song_index = song_position - 1 if song_position < move_position else song_position
-        move_song = vc.queue._queue[song_index]
+        move_song = vc.queue._queue[song_position - 1]
         vc.queue._queue.remove(move_song)
+        move_index = move_position - 1
         vc.queue.put_at_index(move_index, move_song)
 
         moved_song_name = move_song.title
