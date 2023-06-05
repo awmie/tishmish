@@ -234,7 +234,6 @@ async def spotifyplay_command(ctx: commands.Context, search: str):
     )
 
     try:
-        count = 0
         # Initialize the embed before the loop
         queue_embed = nextcord.Embed(
             description='**Loading QUEUE...**',
@@ -248,13 +247,15 @@ async def spotifyplay_command(ctx: commands.Context, search: str):
                 await vc.queue.put_wait(partial)
             song_name = await nextwave.tracks.YouTubeTrack.search(partial.title)
             user_dict[song_name[0].identifier] = ctx.author.mention
-            count += 1
             # Update the description of the embed with the current count
-            queue_embed.description = f'please wait a little Loading QUEUE...**{count}**'
+            queue_embed.description = f'please wait a little Loading QUEUE...**{len(vc.queue)}**'
             await queueCompletion.edit(embed=queue_embed)
-            
+
         vc.ctx = ctx
         setattr(vc, 'loop', False)
+        
+        queue_embed.description = "All songs have been added to the QUEUE. It's all done!"
+        await queueCompletion.edit(embed=queue_embed)
 
     except HTTPException as e:
         if e.status == 400:
