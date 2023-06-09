@@ -424,7 +424,6 @@ async def queue_command(ctx: commands.Context):
         qem.add_field(name='‎', value=f'**{song_count} **• {title}', inline=False)
 
     await ctx.send(embed=qem)
-    return commands.Paginator(prefix='>', suffix='<', linesep='\n')
 
 @commands.cooldown(1, 2, commands.BucketType.user)
 @bot.command(name="shuffle", aliases=['mix'], help='shuffles the existing queue randomly', description=',shuffle')
