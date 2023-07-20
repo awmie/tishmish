@@ -2,10 +2,11 @@
 #### Premium Discord -music bot-
   - youtube, spotify playlist support 
   - hd sound (use headphones)
+  - better clarity on pc
 ### Introducing new spotify integration with our Tishmish
   - command : **,sp**
-  - use : ,sp < spotify playlist link >
-  - function : plays the provided spotify playlist (adds to the queue)
+  - use : ,sp < spotify playlist/album link >
+  - function : plays the provided spotify playlist (adds dynamically to the queue)
 #### how to start this bot: 
 - type **,help** command to get started
 - it will show a list of commands
@@ -29,6 +30,6 @@ for better quality use headphones and your internet connectivity also matters..
 - do not directly disconnect the bot from the channel 👉🏼 [here's the issue](https://github.com/awmie/tishmish/issues/1#issue-1432576605)
 - instead u can directly leave the channel the bot will automatically disconnect.
 - i m working on that direct disconnection problem (if someone tries to directly disconnect the bot)
-**important**
+    –(**important**)–
 - you should create a **'tm'** role in your server (don't forget to move the role below **tishmish** role) and you can assign the **tm** role to your friends for full accessibility of the bot.
 - thanks 
