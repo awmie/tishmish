@@ -23,17 +23,6 @@ all_intents= True
 
 bot = commands.Bot(command_prefix=',', intents = intents, description='Premium quality music bot for free!\nUse headphones for better quality <3')
 # some useful variables
-players = {}
-
-def get_player(guild_id):
-    # Check if a player instance already exists for the guild
-    if guild_id in players:
-        return players[guild_id]
-    
-    # Create a new player instance for the guild
-    player = Player()
-    players[guild_id] = player
-    return player
 
 global user_arr, user_dict
 user_dict = {} 
@@ -336,6 +325,8 @@ async def disconnect_command(ctx: commands.Context):
         return
     vc : nextwave.Player = ctx.voice_client
     try:
+        await vc.stop()
+        await vc.resume()
         await vc.disconnect(force=True)
         await ctx.send(embed=nextcord.Embed(description='**BYE!** Have a great time!', color=embed_color))
     except Exception:
@@ -344,11 +335,14 @@ async def disconnect_command(ctx: commands.Context):
 # Auto-disconnect if all participants leave the voice channel
 @bot.event
 async def on_voice_state_update(member, before, after):
-    if before.channel is not None and (bot.user in before.channel.members and len(before.channel.members) == 1):
-        for vc in bot.voice_clients:
-            if vc.channel == before.channel:
-                await vc.disconnect(force=True)
-                break
+  if before.channel is not None and (bot.user in before.channel.members and len(before.channel.members) == 1):
+      for vc in bot.voice_clients:
+        if vc.channel == before.channel:
+          await vc.stop()
+          await vc.resume()
+          await vc.disconnect(force=True)       
+          break 
+      
 @commands.cooldown(1, 2, commands.BucketType.user)
 @bot.command(name='nowplaying', aliases=['np'], help='shows the current track information', description=',np')
 async def nowplaying_command(ctx: commands.Context):
