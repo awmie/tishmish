@@ -120,7 +120,7 @@ async def on_nextwave_track_end(player: nextwave.Player, track: nextwave.Track, 
                 vc.queue.put(vc.queue._queue[0])
             next_song = vc.queue.get()
             await vc.play(next_song)
-            await ctx.send(embed=nextcord.Embed(description=f'**Current song playing from the `QUEUE`**\n\n`{next_song.title}`', color=embed_color), delete_after=30)
+            await ctx.send(embed=nextcord.Embed(description=f'**Current song playing from the `QUEUE`**\n\n`{next_song.title}`', color=embed_color), delete_after=vc.track.length)
             
     except Exception:
         await vc.stop()
