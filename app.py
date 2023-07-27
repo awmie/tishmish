@@ -410,7 +410,7 @@ async def queue_command(ctx: commands.Context):
 
     lqstr = '`disabled`' if vc.lq == False else '`enabled`'
     global qem
-    qem = nextcord.Embed(description=f'**QUEUE**\n\n**loopqueue**: {lqstr}',color=embed_color)
+    qem = nextcord.Embed(description=f'**QUEUE [total song count:{vc.queue.count}]**\n\n**loopqueue**: {lqstr}',color=embed_color)
     global song_count, song, song_queue
     song_queue = vc.queue.copy()
     for song_count, song in enumerate(song_queue, start=1):
