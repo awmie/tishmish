@@ -1,5 +1,5 @@
 # T I S H M I S H 
-import datetime, random
+import datetime
 import nextcord
 from nextcord.ext import commands
 import nextwave
@@ -427,7 +427,7 @@ async def shuffle_command(ctx: commands.Context):
         return
     vc: nextwave.Player = ctx.voice_client
     if song_count > 2:
-        random.shuffle(vc.queue._queue)
+        vc.queue.shuffle()
         return await ctx.send(
             embed=nextcord.Embed(
                 description='Shuffled the `QUEUE`', color=embed_color
