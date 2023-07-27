@@ -360,7 +360,13 @@ async def nowplaying_command(ctx: commands.Context):
     user_list = list(user_dict.items())
     user_arr = np.array(user_list)
     song_index = np.flatnonzero(np.core.defchararray.find(user_arr,vc.track.identifier) ==0)
-    arr_index = int(song_index/2)
+    
+    if len(song_index) == 0:
+        return await ctx.send(embed=nextcord.Embed(description='Song not found', color=embed_color))
+
+    # Extract the first index from song_index array
+    arr_index = int(song_index[0] / 2)
+
 
     requester = user_arr[arr_index,1]
 
@@ -587,8 +593,10 @@ async def save_command(ctx: commands.Context, savestr: Optional[str]):
     user = await bot.fetch_user(ctx.author._user.id)
     if vc._source and savestr is None:
         await user.send(embed=nextcord.Embed(description=f'`{vc._source}`', color=embed_color))
+        song_saved =  await ctx.send(embed=nextcord.Embed(description='**SONG** saved!', color=embed_color))
     elif not vc.queue.is_empty and savestr == 'q' or savestr == 'queue':
         await user.send(embed=qem)
+        return await ctx.send(embed=nextcord.Embed(description='**QUEUE** saved!', color=embed_color))
     elif not vc.queue.is_empty and savestr:
         if int(savestr) <= 0:
             return await ctx.send(
@@ -603,9 +611,10 @@ async def save_command(ctx: commands.Context, savestr: Optional[str]):
             song_info = vc.queue._queue[int(savestr) - 1]
             em=nextcord.Embed(description=song_info.info['title'], color=embed_color)
             await user.send(embed=em)
+            return song_saved
     else:
         return await ctx.send(embed=nextcord.Embed(description='There is no `song` | `queue` available', color=embed_color))
-        
+        #add reaction as user saves the song
         
 '''main'''
 
