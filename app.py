@@ -90,7 +90,7 @@ async def user_connectivity(ctx: commands.Context):
             )
         )
         return False
-    #-->code to check if the bot is connected to vc??<--
+#-->code to trigger vc.disconnect if bot is disconnected from the channel manually?<--
 @bot.event
 async def on_ready():
     print(f'logged in as: {bot.user.name}')
@@ -194,7 +194,7 @@ async def play_command(ctx: commands.Context, *, search:nextwave.YouTubeTrack):
     if vc.queue.is_empty and vc.is_playing() is False:   
         playString = await ctx.send(embed=nextcord.Embed(description='**searching...**', color=embed_color))
         await vc.play(search)
-        await playString.edit(embed=nextcord.Embed(description=f'**Search found**\n\n`{search.title}`', color=embed_color))
+        await playString.edit(embed=nextcord.Embed(description=f'**Search found**\n\n`{search.title}`', color=embed_color), delete_after=vc.track.length)
 
     else:
         await vc.queue.put_wait(search)
@@ -208,7 +208,7 @@ async def play_command(ctx: commands.Context, *, search:nextwave.YouTubeTrack):
     
 @commands.cooldown(1, 1, commands.BucketType.user)
 @bot.command(name='splay', aliases=['sp'], help='plays the provided spotify playlist link', description=',sp <spotify playlist link>')
-async def spotifyplay_command(ctx: commands.Context, search: str):
+async def spotifyplay_command(ctx: commands.Context, search: str, total_limit: Optional[int]):
 
     if not getattr(ctx.author.voice, 'channel', None):
         return await ctx.send(
@@ -225,11 +225,11 @@ async def spotifyplay_command(ctx: commands.Context, search: str):
     try:
         # Initialize the embed before the loop
         queue_embed = nextcord.Embed(
-            description='**Loading QUEUE...**',
+            description='initialising the **QUEUE**...',
             color=embed_color
         )
         queueCompletion = await ctx.send(embed=queue_embed)
-        async for partial in spotify.SpotifyTrack.iterator(query=search, type=spotify.SpotifySearchType.playlist, partial_tracks=True):
+        async for partial in spotify.SpotifyTrack.iterator(query=search, type=spotify.SpotifySearchType.playlist, partial_tracks=True, limit=total_limit or None):
             if vc.queue.is_empty and vc.is_playing() is False:
                 await vc.play(partial)
             else:
@@ -237,13 +237,13 @@ async def spotifyplay_command(ctx: commands.Context, search: str):
             song_name = await nextwave.tracks.YouTubeTrack.search(partial.title)
             user_dict[song_name[0].identifier] = ctx.author.mention
             # Update the description of the embed with the current count
-            queue_embed.description = f'please wait a little Loading QUEUE...**{len(vc.queue)}**'
+            queue_embed.description = f'Song no. `1` added to the track and remaining`{total_limit-1}`are being pushed to the **QUEUE**:`{int((vc.queue.count/total_limit)*100)}%`'
             await queueCompletion.edit(embed=queue_embed)
 
         vc.ctx = ctx
         setattr(vc, 'loop', False)
         
-        queue_embed.description = "All songs have been added to the QUEUE. It's all done!"
+        queue_embed.description =  f"Total songs exists in the **QUEUE**: `{vc.queue.count}`"
         await queueCompletion.edit(embed=queue_embed)
 
     except HTTPException as e:
