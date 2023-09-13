@@ -1,4 +1,5 @@
-# Tishmish
+# Tishmish 
+### (personal project • not for production)
 #### Premium Discord -music bot-
   - youtube, spotify playlist support 
   - hd sound (use headphones)
