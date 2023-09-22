@@ -3,13 +3,12 @@ import datetime
 import nextcord
 from nextcord.ext import commands
 import nextwave
+import asyncio
 from nextwave.ext import spotify
 from typing import Optional
 import os
 import numpy as np
 from nextcord import HTTPException
-from nextwave import Player
-
 
 # I N T E N T S 
 intents = nextcord.Intents(messages = True, guilds = True)
@@ -570,7 +569,34 @@ async def seek_command(ctx: commands.Context, seekPosition: int):
         msg = await ctx.send(embed=nextcord.Embed(description='seeking...', color=embed_color))
         await vc.seek(seekPosition*1000)
         return await msg.edit(embed=nextcord.Embed(description=f'Player SEEKED: `{seekPosition}` seconds',color=embed_color))
-            
+    
+@commands.cooldown(1, 2, commands.BucketType.user)
+@bot.command(name='restart', aliases=['r'], help='restarts the song', description=',restart | ,r')
+@commands.has_role('tm')
+async def restart_command(ctx: commands.Context):
+    if await user_connectivity(ctx) == False:
+        return
+    vc: nextwave.Player = ctx.voice_client
+    if not vc.is_playing():
+        return await ctx.send(embed=nextcord.Embed(description='Player not playing!', color=embed_color))
+    elif vc.is_playing():
+        msg = await ctx.send(embed=nextcord.Embed(description="Play from the start? **y/n**", color=embed_color))
+
+        def check(response):
+            return response.author == ctx.author and response.channel == ctx.channel
+
+        try:
+            response = await ctx.bot.wait_for('message', timeout=30.0, check=check)
+        except asyncio.TimeoutError:
+            await ctx.send(embed=nextcord.Embed(description='No response received. Restart canceled.', color=embed_color))
+            return
+
+        if response.content.lower() == 'y':
+            await vc.seek(0)
+            await msg.edit(embed=nextcord.Embed(description='Player RESTARTED!', color=embed_color))
+        else:
+            await msg.edit(embed=nextcord.Embed(description='Restart canceled.', color=embed_color))
+    
 @commands.cooldown(1, 5, commands.BucketType.user)
 @bot.command(name='clear',aliases=[], help='clears the queue', description=',clear')
 @commands.has_role('tm')
