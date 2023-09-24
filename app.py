@@ -136,8 +136,6 @@ async def on_command_error(ctx: commands.Context, error):
         em = nextcord.Embed(description=f'**Cooldown active**\ntry again in `{error.retry_after:.2f}`s*',color=embed_color)
         await ctx.send(embed=em)
         
-@bot.event
-async def on_command_error(ctx: commands.Context, error):
     if isinstance(error, commands.MissingRequiredArgument):
         await ctx.send(embed=nextcord.Embed(description="Missing `arguments`", color=embed_color))
 
