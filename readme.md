@@ -4,6 +4,7 @@
   - youtube, spotify playlist support 
   - hd sound (use headphones)
   - better clarity on pc
+  - dolby atmos 
 ### Introducing new spotify integration with our Tishmish
   - command : **,sp**
   - use : ,sp < spotify playlist/album link >
