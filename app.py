@@ -34,7 +34,7 @@ bot.remove_command('help')
 # T I S M I S H help-command
 @bot.group(invoke_without_command= True)
 async def help(ctx, helpstr: Optional[str]):
-    tm_cmds = [skip_command, del_command, move_command, clear_command, seek_command, volume_command, skipto_command, shuffle_command, loop_command, disconnect_command, loopqueue_command, setrole_command, spotifyplay_command]
+    tm_cmds = [skip_command, del_command, move_command, clear_command, seek_command, volume_command, skipto_command, shuffle_command, loop_command, disconnect_command, loopqueue_command, setrole_command, spotifyplay_command, restart_command]
     member_cmds = [ping_command, play_command, pause_command, resume_command, nowplaying_command, queue_command, save_command]
     if helpstr is not None:
         for tmcmds in tm_cmds:
@@ -204,7 +204,7 @@ async def play_command(ctx: commands.Context, *, search:nextwave.YouTubeTrack):
     user_dict[search.identifier] = ctx.author.mention
     
 @commands.cooldown(1, 1, commands.BucketType.user)
-@bot.command(name='splay', aliases=['sp'], help='plays the provided spotify playlist link', description=',sp <spotify playlist link>')
+@bot.command(name='splay', aliases=['sp'], help='plays the provided spotify playlist link upto provided song number', description=',sp <spotify playlist link> <optional: song number>')
 async def spotifyplay_command(ctx: commands.Context, search: str, total_limit: Optional[int]=None):
 
     if not getattr(ctx.author.voice, 'channel', None):
