@@ -335,14 +335,21 @@ async def disconnect_command(ctx: commands.Context):
 # Auto-disconnect if all participants leave the voice channel
 @bot.event
 async def on_voice_state_update(member, before, after):
-  if before.channel is not None and (bot.user in before.channel.members and len(before.channel.members) == 1):
-      for vc in bot.voice_clients:
-        if vc.channel == before.channel:
-          await vc.stop()
-          await vc.resume()
-          await vc.disconnect(force=True)       
-          break 
-      
+    if before.channel is not None and (bot.user in before.channel.members and len(before.channel.members) == 1):
+        for vc in bot.voice_clients:
+            if vc.channel == before.channel:
+                await vc.stop()
+                await vc.resume()
+                await vc.disconnect(force=True)       
+                break 
+
+# if user manually disconnects the bot it gets dicsonnected from the vc
+@bot.event
+async def on_voice_state_update(member, before, after):
+    if member.id == bot.user.id and after.channel is None:
+        for vc in bot.voice_clients:
+            await vc.disconnect(force=True)
+
 @commands.cooldown(1, 2, commands.BucketType.user)
 @bot.command(name='nowplaying', aliases=['np'], help='shows the current track information', description=',np')
 async def nowplaying_command(ctx: commands.Context):
