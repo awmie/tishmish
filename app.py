@@ -206,52 +206,55 @@ async def play_command(ctx: commands.Context, *, search:nextwave.YouTubeTrack):
 @commands.cooldown(1, 1, commands.BucketType.user)
 @bot.command(name='splay', aliases=['sp'], help='plays the provided spotify playlist link upto provided song number', description=',sp <spotify playlist link> <optional: song number>')
 async def spotifyplay_command(ctx: commands.Context, search: str, total_limit: Optional[int]=None):
-
-    if not getattr(ctx.author.voice, 'channel', None):
-        return await ctx.send(
-            embed=nextcord.Embed(
-                description='Try after joining voice channel',
-                color=embed_color,
+    if total_limit <=0:
+        return await ctx.send(embed=nextcord.Embed(description='`song number` can not be `zero` or `negative`', color=embed_color))
+    else:
+        
+        if not getattr(ctx.author.voice, 'channel', None):
+            return await ctx.send(
+                embed=nextcord.Embed(
+                    description='Try after joining voice channel',
+                    color=embed_color,
+                )
             )
+
+        vc: nextwave.Player = (
+            ctx.voice_client or await ctx.author.voice.channel.connect(cls=nextwave.Player)
         )
 
-    vc: nextwave.Player = (
-        ctx.voice_client or await ctx.author.voice.channel.connect(cls=nextwave.Player)
-    )
+        try:
+            # Initialize the embed before the loop
+            queue_embed = nextcord.Embed(
+                description='initialising the **QUEUE**...',
+                color=embed_color
+            )
+            queueCompletion = await ctx.send(embed=queue_embed)
+            async for partial in spotify.SpotifyTrack.iterator(query=search, type=spotify.SpotifySearchType.playlist, partial_tracks=True, limit=total_limit):
+                if vc.queue.is_empty and vc.is_playing() is False:
+                    await vc.play(partial)
+                else:
+                    await vc.queue.put_wait(partial)
+                song_name = await nextwave.tracks.YouTubeTrack.search(partial.title)
+                user_dict[song_name[0].identifier] = ctx.author.mention
+                # Update the description of the embed with the current count
+                if total_limit:
+                    queue_embed.description = f'Song no. `1` added to the track and remaining are being pushed to the **QUEUE**:`{int((vc.queue.count/total_limit)*100)}%`'
+                else:
+                    queue_embed.description = f'Song no. `1` added to the track and remaining are being pushed to the **QUEUE**:`{vc.queue.count}`'
+                await queueCompletion.edit(embed=queue_embed)
 
-    try:
-        # Initialize the embed before the loop
-        queue_embed = nextcord.Embed(
-            description='initialising the **QUEUE**...',
-            color=embed_color
-        )
-        queueCompletion = await ctx.send(embed=queue_embed)
-        async for partial in spotify.SpotifyTrack.iterator(query=search, type=spotify.SpotifySearchType.playlist, partial_tracks=True, limit=total_limit):
-            if vc.queue.is_empty and vc.is_playing() is False:
-                await vc.play(partial)
-            else:
-                await vc.queue.put_wait(partial)
-            song_name = await nextwave.tracks.YouTubeTrack.search(partial.title)
-            user_dict[song_name[0].identifier] = ctx.author.mention
-            # Update the description of the embed with the current count
-            if total_limit:
-                queue_embed.description = f'Song no. `1` added to the track and remaining are being pushed to the **QUEUE**:`{int((vc.queue.count/total_limit)*100)}%`'
-            else:
-                queue_embed.description = f'Song no. `1` added to the track and remaining are being pushed to the **QUEUE**:`{vc.queue.count}`'
+            vc.ctx = ctx
+            setattr(vc, 'loop', False)
+            
+            queue_embed.description =  f"Total songs exists in the **QUEUE**: `{vc.queue.count}`"
             await queueCompletion.edit(embed=queue_embed)
 
-        vc.ctx = ctx
-        setattr(vc, 'loop', False)
-        
-        queue_embed.description =  f"Total songs exists in the **QUEUE**: `{vc.queue.count}`"
-        await queueCompletion.edit(embed=queue_embed)
-
-    except HTTPException as e:
-        if e.status == 400:
-            await ctx.send(embed=nextcord.Embed(description='Error: Invalid playlist URL or ID', color=embed_color))
-        else:
-            raise e
-
+        except HTTPException as e:
+            if e.status == 400:
+                await ctx.send(embed=nextcord.Embed(description='Error: Invalid playlist URL or ID', color=embed_color))
+            else:
+                raise e
+ 
              
 @commands.cooldown(1, 2, commands.BucketType.user)
 @bot.command(name='pause', aliases=['stop'], help='pauses the current playing track', description=',pause')
