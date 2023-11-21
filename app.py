@@ -204,7 +204,7 @@ async def play_command(ctx: commands.Context, *, search:nextwave.YouTubeTrack):
     user_dict[search.identifier] = ctx.author.mention
     
 @commands.cooldown(1, 1, commands.BucketType.user)
-@bot.command(name='splay', aliases=['sp'], help='plays the provided spotify playlist link upto provided song number', description=',sp <spotify playlist link> <optional: song number>')
+@bot.command(name='splay', aliases=['sp'], help='plays the provided spotify playlist link upto provided song number', description=',sp <spotify playlist link> <song number>')
 async def spotifyplay_command(ctx: commands.Context, search: str, total_limit: Optional[int]=None):
     if total_limit == 0 or total_limit < 0:
         return await ctx.send(embed=nextcord.Embed(description='`song number` can not be `zero` or `negative`', color=embed_color))
