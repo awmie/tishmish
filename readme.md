@@ -7,7 +7,7 @@
   - dolby atmos 
 ### Introducing new spotify integration with our Tishmish
   - command : **,sp**
-  - use : ,sp < spotify playlist/album link > < number of songs upto 100 >
+  - use : ,sp < spotify playlist/album link > < number of songs >
   - function : plays the provided spotify playlist (adds dynamically to the queue)
 #### how to start this bot: 
 - type **,help** command to get started
