@@ -28,10 +28,8 @@ for better quality use headphones and your internet connectivity also matters..
 ### enjoy :)
 [bot link](https://discord.com/api/oauth2/authorize?client_id=1007653203711639562&permissions=8&scope=bot)
 
-### warning 
-- do not directly disconnect the bot from the channel 👉🏼 [here's the issue](https://github.com/awmie/tishmish/issues/1#issue-1432576605)
-- instead u can directly leave the channel the bot will automatically disconnect.
-- i m working on that direct disconnection problem (if someone tries to directly disconnect the bot)
-    –(**important**)–
-- you should create a **'tm'** role in your server (don't forget to move the role below **tishmish** role) and you can assign the **tm** role to your friends for full accessibility of the bot.
-- thanks 
+### update 
+- direct disconnection problem has been fixed [resolved](https://github.com/awmie/tishmish/issues/1#issuecomment-1820490567)
+- bot automatically disconnects when all users leave the voice channel 
+
+#### thanks ❤
