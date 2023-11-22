@@ -102,7 +102,7 @@ async def on_nextwave_node_ready(node: nextwave.Node):
 
 async def node_connect():
     await bot.wait_until_ready()
-    await nextwave.NodePool.create_node(bot=bot, host=os.environ['Host'], port=os.environ['Port'], password=os.environ['Password'], https=True, spotify_client=spotify.SpotifyClient(client_id=os.environ['spotify_id'],client_secret=os.environ['spotify_secret']))
+    await nextwave.NodePool.create_node(bot=bot, host=os.environ['Host'], port=os.environ['Port'], password=os.environ['Password'], https=False, spotify_client=spotify.SpotifyClient(client_id=os.environ['spotify_id'],client_secret=os.environ['spotify_secret']))
 
 
 @bot.event
@@ -208,7 +208,6 @@ async def play_command(ctx: commands.Context, *, search:nextwave.YouTubeTrack):
 async def spotifyplay_command(ctx: commands.Context, search: str, total_limit: int):
     if total_limit == 0 or total_limit < 0:
         return await ctx.send(embed=nextcord.Embed(description='`song number` can not be `zero` or `negative`', color=embed_color))
-    
     if not getattr(ctx.author.voice, 'channel', None):
         return await ctx.send(
             embed=nextcord.Embed(
@@ -228,7 +227,7 @@ async def spotifyplay_command(ctx: commands.Context, search: str, total_limit: i
             color=embed_color
         )
         queueCompletion = await ctx.send(embed=queue_embed)
-        async for partial in spotify.SpotifyTrack.iterator(query=search, type=spotify.SpotifySearchType.playlist, partial_tracks=False, limit=total_limit):
+        async for partial in spotify.SpotifyTrack.iterator(query=search, type=spotify.SpotifySearchType.playlist, partial_tracks=True, limit=total_limit):
             if vc.queue.is_empty and vc.is_playing() is False:
                 await vc.play(partial)
             else:
