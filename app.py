@@ -205,7 +205,7 @@ async def play_command(ctx: commands.Context, *, search:nextwave.YouTubeTrack):
     
 @commands.cooldown(1, 1, commands.BucketType.user)
 @bot.command(name='splay', aliases=['sp'], help='plays the provided spotify playlist link upto provided song number', description=',sp <spotify playlist link> <song number>')
-async def spotifyplay_command(ctx: commands.Context, search: str, total_limit: Optional[int]=None):
+async def spotifyplay_command(ctx: commands.Context, search: str, total_limit: int):
     if total_limit == 0 or total_limit < 0:
         return await ctx.send(embed=nextcord.Embed(description='`song number` can not be `zero` or `negative`', color=embed_color))
     
@@ -228,7 +228,7 @@ async def spotifyplay_command(ctx: commands.Context, search: str, total_limit: O
             color=embed_color
         )
         queueCompletion = await ctx.send(embed=queue_embed)
-        async for partial in spotify.SpotifyTrack.iterator(query=search, type=spotify.SpotifySearchType.playlist, partial_tracks=True, limit=total_limit):
+        async for partial in spotify.SpotifyTrack.iterator(query=search, type=spotify.SpotifySearchType.playlist, partial_tracks=False, limit=total_limit):
             if vc.queue.is_empty and vc.is_playing() is False:
                 await vc.play(partial)
             else:
