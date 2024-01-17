@@ -5,15 +5,15 @@
   - hd sound (use headphones)
   - better clarity on pc
   - dolby atmos 
-### Introducing new spotify integration with our Tishmish
-  - command : **,sp**
-  - use : ,sp < spotify playlist/album link > < number of songs >
+
+#### Slash Command Support added
+  - type `/help` to get started
+  
+### Spotify integration with our Tishmish
+  - command : **/spotifyplay**
+  - use : /spotifyplay < spotify playlist/album link > < number of songs >
   - function : plays the provided spotify playlist (adds dynamically to the queue)
-#### how to start this bot: 
-- type **,help** command to get started
-- it will show a list of commands
-- type ,help < any command name > for more info on that command
-- which will include member and **tm** commands
+  - options will be provided automatically
 
 ##### what are tm commands
   - this is created show only chosen members by owner or admin can use those specific commands
