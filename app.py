@@ -67,7 +67,7 @@ async def help(interaction:interactions.Interaction, helpstr: str = nextcord.Sla
     if helpstr == "member commands":
         memberlist = ""
         for membercmds in member_cmds:
-            memberlist += f"**,{membercmds.name}**,`function:{membercmds.description}`\n\n"
+            memberlist += f"**/{membercmds.name}**-`function:{membercmds.description}`\n\n"
         embed = nextcord.Embed(
             title="Member Help Commands",
             description=memberlist,
@@ -78,7 +78,7 @@ async def help(interaction:interactions.Interaction, helpstr: str = nextcord.Sla
     if helpstr=="tm commands":
         tmlist = ""
         for tmcmds in tm_cmds:
-            tmlist += f"**,{tmcmds.name}**,`function:{tmcmds.description}`\n\n"
+            tmlist += f"**/{tmcmds.name}**-`function:{tmcmds.description}`\n\n"
         embed = nextcord.Embed(
             title="TM-Help Commands",
             description=tmlist,
@@ -88,8 +88,8 @@ async def help(interaction:interactions.Interaction, helpstr: str = nextcord.Sla
     
     
     else:
-        tm = "".join(f"`,{i.name}` " for i in tm_cmds)
-        mm = "".join(f"`,{j.name}` " for j in member_cmds)
+        tm = "".join(f"`/{i.name}` " for i in tm_cmds)
+        mm = "".join(f"`/{j.name}` " for j in member_cmds)
         help_description = f"{bot.description}\n\n**member commands**\n{mm}\n\n**tm commands**\n{tm}\n\n"
         embed = nextcord.Embed(
             title="Tishmish Help", description=help_description, color=embed_color
