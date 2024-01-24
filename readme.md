@@ -31,5 +31,5 @@ for better quality use headphones and your internet connectivity also matters..
 ### update 
 - direct disconnection problem has been fixed [resolved](https://github.com/awmie/tishmish/issues/1#issuecomment-1820490567)
 - bot automatically disconnects when all users leave the voice channel 
-
+- now `Queue` supports upto 100 songs at once.
 #### thanks ❤
