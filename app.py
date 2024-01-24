@@ -1,7 +1,7 @@
 # T I S H M I S H
 import nextcord
 from nextcord import interactions
-from nextcord.ext import commands
+from nextcord.ext import commands, tasks
 import nextwave
 from nextwave.ext import spotify
 import numpy as np
@@ -202,7 +202,7 @@ async def loopqueue_command(interaction: interactions.Interaction, type: str=nex
                 description="**loopqueue**: `disabled`", color=embed_color
             )
         )
-        if song_count == 1 and vc.queue._queue[0] == vc._source:
+        if vc.queue.count == 1 and vc.queue._queue[0] == vc._source:
             del vc.queue._queue[0]
         else:
             return ""
@@ -213,7 +213,7 @@ async def ping_command(interaction: interactions.Interaction):
     em = nextcord.Embed(
         description=f"**Pong!**\n\n`{round(bot.latency*1000)}`ms", color=embed_color
     )
-    await interaction.response.send_message(embed=em)
+    await interaction.response.send_message(embed=em, delete_after=5)
 
 
 @commands.cooldown(1, 1, commands.BucketType.user)
@@ -234,7 +234,7 @@ async def play_command(interaction: interactions.Interaction, *, search: str):
     first_track = search_results[0]  # Get the first track from the list
     
     if vc.queue.is_empty and vc.is_playing() is False:
-        # await interaction.defer()
+        
         playString = await interaction.response.send_message(
             embed=nextcord.Embed(description="**searching...**", color=embed_color)
         )
@@ -246,18 +246,20 @@ async def play_command(interaction: interactions.Interaction, *, search: str):
                 description=f"**Search found**\n\n`{first_track.title}`",
                 color=embed_color,
             ),
-            delete_after=vc.track.length,
+            delete_after=5,
         )
-
+        
     else:
         await vc.queue.put_wait(first_track)
-        await interaction.response.send_message(
+        added_to_queue_msg = await interaction.response.send_message(
             embed=nextcord.Embed(
                 description=f"Added to the `QUEUE`\n\n`{first_track.title}`",
                 color=embed_color,
             )
         )
 
+        await added_to_queue_msg.edit(embed=nextcord.Embed(description=f"Added to the `QUEUE`\n\n`{first_track.title}`", color=embed_color), delete_after=5)
+    
     setattr(vc, "loop", False)
     user_dict[first_track.identifier] = interaction.user.mention
     
@@ -281,7 +283,7 @@ async def on_nextwave_track_end(player: nextwave.Player, track: nextwave.Track, 
                     ),
                 delete_after=player.track.length
                 )
-
+        
         else:
             await player.stop()
             channel = player.channel
@@ -290,7 +292,7 @@ async def on_nextwave_track_end(player: nextwave.Player, track: nextwave.Track, 
                     description="The queue is empty.", color=embed_color
                 )
             )
-
+        
     except Exception:
             channel = player.channel
             await channel.send(
@@ -308,10 +310,10 @@ async def on_nextwave_track_end(player: nextwave.Player, track: nextwave.Track, 
 async def spotifyplay_command(
     interaction: interactions.Interaction, search: str, total_limit: int
 ):
-    if total_limit == 0 or total_limit < 0:
+    if total_limit == 0 or total_limit < 0 or total_limit > 100:
         return await interaction.response.send_message(
             embed=nextcord.Embed(
-                description="`song number` can not be `zero` or `negative`",
+                description="max limit is `100` and min limit is `1`",
                 color=embed_color,
             )
         )
@@ -374,20 +376,20 @@ async def pause_command(interaction: interactions.Interaction):
             return await interaction.response.send_message(
                 embed=nextcord.Embed(
                     description="`PAUSED` the music!", color=embed_color
-                )
+                ),delete_after=5
             )
 
         elif vc.is_paused():
             return await interaction.response.send_message(
                 embed=nextcord.Embed(
                     description="Already in `PAUSED State`", color=embed_color
-                )
+                ),delete_after=5
             )
     else:
         return await interaction.response.send_message(
             embed=nextcord.Embed(
                 description="Player is not `playing`!", color=embed_color
-            )
+            ),delete_after=5
         )
 
 
@@ -402,20 +404,20 @@ async def resume_command(interaction: interactions.Interaction):
         if vc.is_paused():
             await vc.resume()
             await interaction.response.send_message(
-                embed=nextcord.Embed(description="Music `RESUMED`!", color=embed_color)
+                embed=nextcord.Embed(description="Music `RESUMED`!", color=embed_color),delete_after=5
             )
 
         elif vc.is_playing():
             await interaction.response.send_message(
                 embed=nextcord.Embed(
                     description="Already in `RESUMED State`", color=embed_color
-                )
+                ),delete_after=5
             )
     else:
         await interaction.response.send_message(
             embed=nextcord.Embed(
                 description="Player is not `playing`!", color=embed_color
-            )
+            ),delete_after=5
         )
 
 
@@ -430,7 +432,7 @@ async def skip_command(interaction: interactions.Interaction):
     if vc.loop == True:
         vclooptxt = "Disable the `LOOP` to skip | **,loop** again to disable the `LOOP` | Add a new song to disable the `LOOP`"
         return await interaction.response.send_message(
-            embed=nextcord.Embed(description=vclooptxt, color=embed_color)
+            embed=nextcord.Embed(description=vclooptxt, color=embed_color),delete_after=5
         )
 
     elif vc.queue.is_empty:
@@ -440,17 +442,16 @@ async def skip_command(interaction: interactions.Interaction):
             embed=nextcord.Embed(
                 description="Song stopped! No songs in the `QUEUE`",
                 color=embed_color,
-            )
+            ),delete_after=5
         )
 
     else:
         await vc.stop()
         vc.queue._wakeup_next()
         await vc.resume()
-        return await interaction.response.send_message(
-            embed=nextcord.Embed(description="`SKIPPED`!", color=embed_color)
+        await interaction.response.send_message(
+            embed=nextcord.Embed(description="`SKIPPED`!", color=embed_color),delete_after=5
         )
-
 
 @commands.cooldown(1, 2, commands.BucketType.user)
 @bot.slash_command(
@@ -473,7 +474,7 @@ async def disconnect_command(interaction: interactions.Interaction):
         )
     except Exception:
         await interaction.response.send_message(
-            embed=nextcord.Embed(description="Failed to destroy!", color=embed_color)
+            embed=nextcord.Embed(description="Failed to destroy!", color=embed_color),delete_after=5
         )
 
 
@@ -543,7 +544,7 @@ async def nowplaying_command(interaction: interactions.Interaction):
         inline=False,
     )
 
-    return await interaction.response.send_message(embed=em)
+    return await interaction.response.send_message(embed=em, delete_after=10)
 
 
 @commands.cooldown(1, 2, commands.BucketType.user)
@@ -558,7 +559,7 @@ async def loop_command(interaction: interactions.Interaction):
     vc: nextwave.Player = interaction.guild.voice_client
     if not vc._source:
         return await interaction.response.send_message(
-            embed=nextcord.Embed(description="No song to `loop`", color=embed_color)
+            embed=nextcord.Embed(description="No song to `loop`", color=embed_color),delete_after=5
         )
     try:
         vc.loop ^= True
@@ -566,11 +567,11 @@ async def loop_command(interaction: interactions.Interaction):
         setattr(vc, "loop", False)
     return (
         await interaction.response.send_message(
-            embed=nextcord.Embed(description="**LOOP**: `enabled`", color=embed_color)
+            embed=nextcord.Embed(description="**LOOP**: `enabled`", color=embed_color),delete_after=5
         )
         if vc.loop
         else await interaction.response.send_message(
-            embed=nextcord.Embed(description="**LOOP**: `disabled`", color=embed_color)
+            embed=nextcord.Embed(description="**LOOP**: `disabled`", color=embed_color), delete_after=5
         )
     )
 
@@ -589,21 +590,17 @@ async def queue_command(interaction: interactions.Interaction):
         return await interaction.response.send_message(
             embed=nextcord.Embed(description="**QUEUE**\n\n`empty`", color=embed_color)
         )
-
+    
     lqstr = "`disabled`" if vc.lq == False else "`enabled`"
-    global qem
-    qem = nextcord.Embed(
-        description=f"**QUEUE [total song count:{vc.queue.count}]**\n\n**loopqueue**: {lqstr}",
-        color=embed_color,
+    
+    song_array = np.array([(i+1, song.title if isinstance(song, nextwave.tracks.PartialTrack) else song.info["title"]) for i, song in enumerate(vc.queue, start=0)])
+
+    await interaction.response.send_message(embed=nextcord.Embed(
+        title=f"**QUEUE [total song count:{vc.queue.count}]**\n\n**loopqueue**: {lqstr}",
+        description="\n".join([f"**{i}**. {song}" for i, song in song_array]),
+        color=embed_color
     )
-    global song_count, song, song_queue
-    song_queue = vc.queue.copy()
-    for song_count, song in enumerate(song_queue, start=1):
-        title = song.title if nextwave.tracks.PartialTrack else song.info["title"]
-        qem.add_field(name="‎", value=f"**{song_count} **• {title}", inline=False)
-
-    await interaction.response.send_message(embed=qem)
-
+)
 
 @commands.cooldown(1, 2, commands.BucketType.user)
 @bot.slash_command(
@@ -615,21 +612,21 @@ async def shuffle_command(interaction: interactions.Interaction):
     if await user_connectivity(interaction) == False:
         return
     vc: nextwave.Player = interaction.guild.voice_client
-    if song_count > 2:
+    if vc.queue.count > 1:
         vc.queue.shuffle()
         return await interaction.response.send_message(
-            embed=nextcord.Embed(description="Shuffled the `QUEUE`", color=embed_color)
+            embed=nextcord.Embed(description="Shuffled the `QUEUE`", color=embed_color),delete_after=5
         )
     elif vc.queue.is_empty:
         return await interaction.response.send_message(
-            embed=nextcord.Embed(description="`QUEUE` is empty", color=embed_color)
+            embed=nextcord.Embed(description="`QUEUE` is empty", color=embed_color),delete_after=5
         )
     else:
         return await interaction.response.send_message(
             embed=nextcord.Embed(
                 description="`QUEUE` has less than `3 songs`",
                 color=embed_color,
-            )
+            ),delete_after=5
         )
 
 
@@ -647,20 +644,20 @@ async def del_command(interaction: interactions.Interaction, position: int):
         return await interaction.response.send_message(
             embed=nextcord.Embed(
                 description="No songs in the `QUEUE`", color=embed_color
-            )
+            ),delete_after=5
         )
     if position <= 0:
         return await interaction.response.send_message(
             embed=nextcord.Embed(
                 description="Position can not be `ZERO`* or `LESSER`",
                 color=embed_color,
-            )
+            ),delete_after=5
         )
-    elif position > song_count:
+    elif position > vc.queue.count:
         return await interaction.response.send_message(
             embed=nextcord.Embed(
                 description=f"Position `{position}` is outta range", color=embed_color
-            )
+            ),delete_after=5
         )
     else:
         SongToBeDeleted = vc.queue._queue[position - 1].title
@@ -669,7 +666,7 @@ async def del_command(interaction: interactions.Interaction, position: int):
             embed=nextcord.Embed(
                 description=f"`{SongToBeDeleted}` removed from the QUEUE",
                 color=embed_color,
-            )
+            ),delete_after=5
         )
 
 
@@ -687,26 +684,26 @@ async def skipto_command(interaction: interactions.Interaction, position: int):
         return await interaction.response.send_message(
             embed=nextcord.Embed(
                 description="No songs in the `QUEUE`", color=embed_color
-            )
+            ),delete_after=5
         )
     if position <= 0:
         return await interaction.response.send_message(
             embed=nextcord.Embed(
                 description="Position can not be `ZERO`* or `LESSER`",
                 color=embed_color,
-            )
+            ),delete_after=5
         )
-    elif position > song_count:
+    elif position > vc.queue.count:
         return await interaction.response.send_message(
             embed=nextcord.Embed(
                 description=f"Position `{position}` is outta range", color=embed_color
-            )
+            ),delete_after=5
         )
     elif position == vc.queue._queue[position - 1]:
         return await interaction.response.send_message(
             embed=nextcord.Embed(
                 description="Already in that `Position`!", color=embed_color
-            )
+            ),delete_after=5
         )
     else:
         vc.queue.put_at_front(vc.queue._queue[position - 1])
@@ -730,14 +727,14 @@ async def move_command(
         return await interaction.response.send_message(
             embed=nextcord.Embed(
                 description="No songs in the `QUEUE`!", color=embed_color
-            )
+            ),delete_after=5
         )
     if song_position <= 0 or move_position <= 0:
         return await interaction.response.send_message(
             embed=nextcord.Embed(
                 description="Position can not be `ZERO`* or `LESSER`",
                 color=embed_color,
-            )
+            ),delete_after=5
         )
 
     queue_length = len(vc.queue)
@@ -746,14 +743,14 @@ async def move_command(
         return await interaction.response.send_message(
             embed=nextcord.Embed(
                 description=f"Position `{position}` is outta range!", color=embed_color
-            )
+            ),delete_after=5
         )
     elif song_position == move_position:
         return await interaction.response.send_message(
             embed=nextcord.Embed(
                 description=f"Already in that `Position`:{move_position}",
                 color=embed_color,
-            )
+            ),delete_after=5
         )
     else:
         move_song = vc.queue._queue[song_position - 1]
@@ -766,7 +763,7 @@ async def move_command(
             embed=nextcord.Embed(
                 description=f"**{moved_song_name}** moved at Position:`{move_position}`",
                 color=embed_color,
-            )
+            ),delete_after=5
         )
 
 @commands.cooldown(1, 2, commands.BucketType.user)
@@ -781,25 +778,25 @@ async def volume_command(interaction: interactions.Interaction, playervolume: in
             return await interaction.response.send_message(
                 embed=nextcord.Embed(
                     description="**VOLUME** supported upto `100%`", color=embed_color
-                )
+                ),delete_after=5
             )
         elif playervolume < 0:
             return await interaction.response.send_message(
                 embed=nextcord.Embed(
                     description="**VOLUME** can not be `negative`", color=embed_color
-                )
+                ),delete_after=5
             )
         else:
             await interaction.response.send_message(
                 embed=nextcord.Embed(
                     description=f"**VOLUME**\nSet to `{playervolume}%`",
                     color=embed_color,
-                )
+                ),delete_after=5
             )
             return await vc.set_volume(playervolume)
     elif not vc.is_connected():
         return await interaction.response.send_message(
-            embed=nextcord.Embed(description="Player not connected!", color=embed_color)
+            embed=nextcord.Embed(description="Player not connected!", color=embed_color),delete_after=5
         )
 
 
@@ -813,12 +810,12 @@ async def restart_command(interaction: interactions.Interaction):
     vc: nextwave.Player = interaction.guild.voice_client
     if not vc.is_playing():
         return await interaction.response.send_message(
-            embed=nextcord.Embed(description="Player not playing!", color=embed_color)
+            embed=nextcord.Embed(description="Player not playing!", color=embed_color),delete_after=5
         )
     elif vc.is_playing():
         msg = await interaction.response.send_message(embed=nextcord.Embed(description="Restarting...", color=embed_color))
         await vc.seek(0)
-        return await msg.edit(embed=nextcord.Embed(description="Player restarted!", color=embed_color))
+        return await msg.edit(embed=nextcord.Embed(description="Player restarted!", color=embed_color),delete_after=5)
         
 
 
@@ -835,14 +832,14 @@ async def clear_command(interaction: interactions.Interaction):
         return await interaction.response.send_message(
             embed=nextcord.Embed(
                 description="No `SONGS` are present", color=embed_color
-            )
+            ),delete_after=5
         )
     vc.queue._queue.clear()
     vc.lq = False
     clear_command_embed = nextcord.Embed(
         description="`QUEUE` cleared", color=embed_color
     )
-    return await interaction.response.send_message(embed=clear_command_embed)
+    return await interaction.response.send_message(embed=clear_command_embed, delete_after=5)
 
 
 @commands.cooldown(1, 2, commands.BucketType.user)
@@ -850,50 +847,25 @@ async def clear_command(interaction: interactions.Interaction):
     name="save",
     description="dms the current or specified song to the user",
 )
-async def save_command(interaction: interactions.Interaction, savestr=nextcord.SlashOption(name="save_options",
-    description="choose song no. or type q to get queue saved", required=False, choices=None
-)):
+async def save_command(interaction: interactions.Interaction):
     vc: nextwave.Player = interaction.guild.voice_client
     if await user_connectivity(interaction) == False:
         return
     user = await bot.fetch_user(interaction.user.id)
-    if vc._source and savestr is None:
+    if vc._source:
         await user.send(
-            embed=nextcord.Embed(description=f"`{vc._source}`", color=embed_color)
+            embed=nextcord.Embed(description=f"`{vc._source}`", color=embed_color),delete_after=5
         )
         song_saved = await interaction.response.send_message(
-            embed=nextcord.Embed(description="**SONG** saved!", color=embed_color)
+            embed=nextcord.Embed(description="**SONG** saved!", color=embed_color),delete_after=5
         )
-    elif not vc.queue.is_empty and savestr == "q":
-        await user.send(embed=qem)
-        return await interaction.response.send_message(
-            embed=nextcord.Embed(description="**QUEUE** saved!", color=embed_color)
-        )
-    elif not vc.queue.is_empty and savestr:
-        if int(savestr) <= 0:
-            return await interaction.response.send_message(
-                embed=nextcord.Embed(
-                    description="Position can not be `ZERO`* or `LESSER`",
-                    color=embed_color,
-                )
-            )
-        elif int(savestr) > song_count:
-            return await interaction.response.send_message(
-                embed=nextcord.Embed(
-                    description=f"Position `{savestr}` is outta range",
-                    color=embed_color,
-                )
-            )
-        else:
-            song_info = vc.queue._queue[int(savestr) - 1]
-            em = nextcord.Embed(description=song_info['title'], color=embed_color)
-            await user.send(embed=em)
-            return song_saved
+        await song_saved.delete(delay=5)
+        
     else:
         return await interaction.response.send_message(
             embed=nextcord.Embed(
                 description="There is no `song` | `queue` available", color=embed_color
-            )
+            ),delete_after=5
         )
 
 @commands.cooldown(1,2,commands.BucketType.user)
@@ -905,7 +877,7 @@ async def seek_command(interaction:interactions.Interaction, seekpos: int):
     vc: nextwave.Player = interaction.guild.voice_client
     if not vc.is_playing():
         return await interaction.response.send_message(
-            embed=nextcord.Embed(description="Player not playing!", color=embed_color)
+            embed=nextcord.Embed(description="Player not playing!", color=embed_color),delete_after=5
         )    
     
     else:
@@ -914,7 +886,7 @@ async def seek_command(interaction:interactions.Interaction, seekpos: int):
                 embed=nextcord.Embed(
                     description=f"SEEK length `{seekpos}` outta range",
                     color=embed_color
-                )
+                ),delete_after=5
             )
         else:
             await vc.seek(seekpos*1000)
@@ -922,7 +894,7 @@ async def seek_command(interaction:interactions.Interaction, seekpos: int):
                 embed=nextcord.Embed(
                     description=f"Player seeked to `{seekpos}` sec.",
                     color=embed_color
-                )
+                ),delete_after=5
             )
     
 """main"""
