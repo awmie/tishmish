@@ -308,15 +308,8 @@ async def on_nextwave_track_end(player: nextwave.Player, track: nextwave.Track, 
     description="plays the provided spotify playlist link upto provided song number",
 )
 async def spotifyplay_command(
-    interaction: interactions.Interaction, search: str, total_limit: int
+    interaction: interactions.Interaction, search: str, limit: int = 100
 ):
-    if total_limit == 0 or total_limit < 0 or total_limit > 100:
-        return await interaction.response.send_message(
-            embed=nextcord.Embed(
-                description="max limit is `100` and min limit is `1`",
-                color=embed_color,
-            )
-        )
     if not interaction.user.voice:
         return await interaction.response.send_message("Join a voice channel first!")
 
@@ -335,25 +328,26 @@ async def spotifyplay_command(
             query=search,
             type=spotify.SpotifySearchType.playlist,
             partial_tracks=True,
-            limit=total_limit,
+            limit=limit,
         ):
             if vc.queue.is_empty and vc.is_playing() is False:
                 await vc.play(partial)
+                limit = limit - 1
             else:
                 await vc.queue.put_wait(partial)
             song_name = await nextwave.tracks.YouTubeTrack.search(partial.title)
             user_dict[song_name[0].identifier] = interaction.user.mention
             # Update the description of the embed with the current count
-            if total_limit:
-                queue_embed.description = f"Song no. `1` added to the track and remaining are being pushed to the **QUEUE**:`{int((vc.queue.count/total_limit)*100)}%`"
+            if limit == 100:
+                queue_embed.description = f"Song no. `1` added to the track and remaining are being pushed to the **QUEUE**:`{vc.queue.count}/`**100**"
             else:
-                queue_embed.description = f"Song no. `1` added to the track and remaining are being pushed to the **QUEUE**:`{vc.queue.count}`"
+                queue_embed.description = f"Song no. `1` added to the track and remaining are being pushed to the **QUEUE**:`{vc.queue.count}/`**{limit}**"
             await queueCompletion.edit(embed=queue_embed)
 
         setattr(vc, "loop", False)
 
         queue_embed.description = (
-            f"Total songs exists in the **QUEUE**: `{vc.queue.count}`"
+            f"Total successfully added to the **QUEUE**: `{vc.queue.count}`"
         )
         await queueCompletion.edit(embed=queue_embed)
 
