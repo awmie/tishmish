@@ -290,7 +290,7 @@ async def on_nextwave_track_end(player: nextwave.Player, track: nextwave.Track, 
             await channel.send(
                 embed=nextcord.Embed(
                     description="The queue is empty.", color=embed_color
-                )
+                ),delete_after=5
             )
         
     except Exception:
@@ -298,7 +298,7 @@ async def on_nextwave_track_end(player: nextwave.Player, track: nextwave.Track, 
             await channel.send(
             embed=nextcord.Embed(
                 description="An error occurred while playing the next song.", color=embed_color
-            )
+            ),delete_after=5
         ) 
 
 
