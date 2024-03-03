@@ -460,6 +460,7 @@ async def disconnect_command(interaction: interactions.Interaction):
     try:
         await vc.stop()
         await vc.resume()
+        vc.queue._queue.clear()
         await vc.disconnect(force=True)
         await interaction.response.send_message(
             embed=nextcord.Embed(
