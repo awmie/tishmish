@@ -510,7 +510,7 @@ async def nowplaying_command(interaction: interactions.Interaction):
     user_list = list(user_dict.items())
     user_arr = np.array(user_list)
     song_index = np.flatnonzero(
-        np.core.defchararray.find(user_arr, vc.track.identifier) == 0
+        np.char.find(user_arr, vc.track.identifier) == 0
     )
 
     if len(song_index) == 0:
