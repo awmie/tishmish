@@ -864,7 +864,7 @@ async def save_command(interaction: interactions.Interaction):
         )
 
 @commands.cooldown(1,2,commands.BucketType.user)
-@bot.slash_command(name="seek", description="says hi")
+@bot.slash_command(name="seek", description="seeks to the specified position for eg. 30sec")
 @commands.has_role("tm")
 async def seek_command(interaction:interactions.Interaction, seekpos: int):
     if await user_connectivity(interaction) == False:
