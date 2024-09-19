@@ -14,6 +14,12 @@
   - function : plays the provided spotify playlist (adds dynamically to the queue)
   - options will be provided automatically
 
+### AI queue support
+  - command : `/predict (song_number)`
+  - function : predict the next song in the queue upto song_number(max 10)
+  - options will be provided automatically
+  - works with the [g4f Library](https://github.com/xtekky/gpt4free)
+
 ##### what are `tm` commands
   - this is created show only chosen members by owner or admin can use those specific commands
   - now users having **'tm'** role will be able to access the **tm commands** 

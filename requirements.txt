@@ -1,3 +1,6 @@
 nextcord
 numpy
 nextwave
+g4f
+nest_asyncio
+curl_cffi

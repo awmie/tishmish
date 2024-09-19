@@ -28,77 +28,59 @@ global user_arr, user_dict
 user_dict = {}
 user_arr = np.array([])
 setattr(nextwave.Player, "lq", False)
+setattr(nextwave.Player, "autoplay", False)
 embed_color = nextcord.Color.from_rgb(128, 67, 255)
 
 # # T I S M I S H help-command
-@commands.cooldown(1,1,commands.BucketType.user)
-@bot.slash_command(name="help", description="all u need")
-async def help(interaction:interactions.Interaction, helpstr: str = nextcord.SlashOption(
-    name='help_choices', description='choose one of the help commands',
-    required=False, choices={"member commands","tm commands"}
-    
+@commands.cooldown(1, 1, commands.BucketType.user)
+@bot.slash_command(name="help", description="All you need")
+async def help(interaction: nextcord.Interaction, helpstr: str = nextcord.SlashOption(
+    name='help_choices', description='Choose one of the help commands',
+    required=False, choices={"member commands", "tm commands"}
 )):
-    tm_cmds = [
-        skip_command,
-        del_command,
-        move_command,
-        clear_command,
-        seek_command,
-        volume_command,
-        skipto_command,
-        shuffle_command,
-        loop_command,
-        disconnect_command,
-        loopqueue_command,
-        set_role_command,
-        spotifyplay_command,
-        restart_command,
-    ]
-    member_cmds = [
-        ping_command,
-        play_command,
-        pause_command,
-        resume_command,
-        nowplaying_command,
-        queue_command,
-        save_command,
-    ]
-    
-    if helpstr == "member commands":
-        memberlist = ""
-        for membercmds in member_cmds:
-            memberlist += f"**/{membercmds.name}**-`function:{membercmds.description}`\n\n"
+    # List of TM and Member commands
+    commands_dict = {
+        "tm commands": [
+            skip_command, del_command, move_command, clear_command, seek_command, 
+            volume_command, skipto_command, shuffle_command, loop_command, 
+            disconnect_command, loopqueue_command, set_role_command, 
+            spotifyplay_command, restart_command, predict_command
+        ],
+        "member commands": [
+            ping_command, play_command, pause_command, resume_command, 
+            nowplaying_command, queue_command, save_command
+        ]
+    }
+
+    # Function to format the command list
+    def format_command_list(cmd_list):
+        return "\n\n".join([f"**/{cmd.name}** - `function: {cmd.description}`" for cmd in cmd_list])
+
+    # Check the chosen help category and prepare the corresponding embed
+    if helpstr in commands_dict:
         embed = nextcord.Embed(
-            title="Member Help Commands",
-            description=memberlist,
+            title=f"{helpstr.capitalize()} Help Commands",
+            description=format_command_list(commands_dict[helpstr]),
             color=embed_color,
         )
         await interaction.response.send_message(embed=embed)
-    
-    if helpstr=="tm commands":
-        tmlist = ""
-        for tmcmds in tm_cmds:
-            tmlist += f"**/{tmcmds.name}**-`function:{tmcmds.description}`\n\n"
-        embed = nextcord.Embed(
-            title="TM-Help Commands",
-            description=tmlist,
-            color=embed_color,
-        )
-        await interaction.response.send_message(embed=embed)
-    
-    
     else:
-        tm = "".join(f"`/{i.name}` " for i in tm_cmds)
-        mm = "".join(f"`/{j.name}` " for j in member_cmds)
-        help_description = f"{bot.description}\n\n**member commands**\n{mm}\n\n**tm commands**\n{tm}\n\n"
+        # General help message if no specific category is chosen
+        all_commands = {category: format_command_list(cmds) for category, cmds in commands_dict.items()}
+        help_description = (
+            f"{bot.description}\n\n**Member Commands**\n{all_commands['member commands']}\n\n"
+            f"**TM Commands**\n{all_commands['tm commands']}\n\n"
+        )
         embed = nextcord.Embed(
             title="Tishmish Help", description=help_description, color=embed_color
         )
         embed.add_field(
-            name="view more options for `/help +1 options`",
-            value="To use tm-commands, server owner/admin can provide **tm** role to the member\n[help](https://github.com/awmie/tishmish/blob/main/readme.md)",
+            name="View more options with `/help +1 options`",
+            value="To use TM commands, server owner/admin can provide **tm** role to the member\n"
+                  "[Help](https://github.com/awmie/tishmish/blob/main/readme.md)",
         )
         await interaction.response.send_message(embed=embed)
+
 
 
 # T I S H M I S H commands
@@ -108,8 +90,12 @@ async def help(interaction:interactions.Interaction, helpstr: str = nextcord.Sla
     name="role",
     description="sets an existing role which are below tishmish(role) for a user",
 )
-@commands.has_permissions(administrator=True)
-async def set_role_command(interaction:interactions.Interaction,user: nextcord.Member, role: nextcord.Role):
+@commands.has_permissions(manage_roles=True)
+async def set_role_command(interaction: interactions.Interaction, user: nextcord.Member, role: nextcord.Role):
+    if role.position > interaction.guild.me.top_role.position:
+        return await interaction.response.send_message("I do not have permission to manage this role.", ephemeral=True)
+    if role.position > user.top_role.position:
+        return await interaction.response.send_message("You do not have permission to manage this role.", ephemeral=True)
     await user.add_roles(role)
     embed = nextcord.Embed(
         description=f"`{user.name}` has been given a role called: **{role.name}**",
@@ -141,13 +127,13 @@ async def node_connect():
     await bot.wait_until_ready()
     await nextwave.NodePool.create_node(
         bot=bot,
-        host=os.environ["Host"],
-        port=os.environ["Port"],
-        password=os.environ["Password"],
-        https=False,
+        host="v3.lavalink.rocks",
+        port=443,
+        password="horizxon.tech",
+        https=True,
         spotify_client=spotify.SpotifyClient(
-            client_id=os.environ["spotify_id"],
-            client_secret=os.environ["spotify_secret"],
+            client_id=os.environ['SPOTIFY_CLIENT_ID'],
+            client_secret=os.environ['SPOTIFY_CLIENT_SECRET'],
         ),
     )
 
@@ -229,10 +215,21 @@ async def play_command(interaction: interactions.Interaction, *, search: str):
         )
     else:
         vc: nextwave.Player = interaction.guild.voice_client
+    try:
+        if search.startswith('https://open.spotify.com/playlist/') or search.startswith('https://open.spotify.com/album/') or search.startswith('https://open.spotify.com/track/'):
+            await spotifyplay_command(interaction, search, limit=10)
+            return
+        if search.startswith('https://youtu.be/') or search.startswith('https://www.youtube.com/'):
+            search = search.split("&")[0]
+            search = search.split("?")[0]
+            search = search.replace("https://youtu.be/","")
+            search = search.replace("https://www.youtube.com/","")
+            search = f"https://www.youtube.com/watch?v={search}"
+    except Exception:
+        return await interaction.response.send_message(embed=nextcord.Embed(description="Invalid Spotify URL", color=embed_color))
         
     search_results = await nextwave.tracks.YouTubeTrack.search(search)
-    first_track = search_results[0]  # Get the first track from the list
-    
+    first_track = search_results[0] # Get the first track from the list
     if vc.queue.is_empty and vc.is_playing() is False:
         
         playString = await interaction.response.send_message(
@@ -251,25 +248,24 @@ async def play_command(interaction: interactions.Interaction, *, search: str):
         
     else:
         await vc.queue.put_wait(first_track)
-        added_to_queue_msg = await interaction.response.send_message(
+        await interaction.send(
             embed=nextcord.Embed(
                 description=f"Added to the `QUEUE`\n\n`{first_track.title}`",
                 color=embed_color,
             )
         )
 
-        await added_to_queue_msg.edit(embed=nextcord.Embed(description=f"Added to the `QUEUE`\n\n`{first_track.title}`", color=embed_color), delete_after=5)
+        # await added_to_queue_msg.edit(embed=nextcord.Embed(description=f"Added to the `QUEUE`\n\n`{first_track.title}`", color=embed_color), delete_after=5)
     
     setattr(vc, "loop", False)
     user_dict[first_track.identifier] = interaction.user.mention
-    
 @bot.event
 async def on_nextwave_track_end(player: nextwave.Player, track: nextwave.Track, reason):
     
     vc: nextwave.Player = player.guild.voice_client
     if vc.loop is True:
         return await player.play(track)
-    
+
     try:
         if not player.queue.is_empty:
             if player.lq:
@@ -283,7 +279,6 @@ async def on_nextwave_track_end(player: nextwave.Player, track: nextwave.Track, 
                     ),
                 delete_after=player.track.length
                 )
-        
         else:
             await player.stop()
             channel = player.channel
@@ -305,7 +300,7 @@ async def on_nextwave_track_end(player: nextwave.Player, track: nextwave.Track, 
 @commands.cooldown(1, 1, commands.BucketType.user)
 @bot.slash_command(
     name="spotifyplay",
-    description="plays the provided spotify playlist link upto provided song number",
+    description="plays the provided spotify playlist link up to the provided song number",
 )
 async def spotifyplay_command(
     interaction: interactions.Interaction, search: str, limit: int = 100
@@ -321,41 +316,47 @@ async def spotifyplay_command(
     try:
         # Initialize the embed before the loop
         queue_embed = nextcord.Embed(
-            description="initialising the **QUEUE**...", color=embed_color
+            description="initializing the **QUEUE**...", color=embed_color
         )
-        queueCompletion = await interaction.response.send_message(embed=queue_embed)
+        queue_completion = await interaction.response.send_message(embed=queue_embed)
+        
+        # Iterate over the tracks
         async for partial in spotify.SpotifyTrack.iterator(
             query=search,
             type=spotify.SpotifySearchType.playlist,
             partial_tracks=True,
             limit=limit,
         ):
+            # Search for YouTubeTrack using the title
+            youtube_tracks = await nextwave.tracks.YouTubeTrack.search(partial.title)
+            if not youtube_tracks:
+                continue  # Skip if no YouTube track is found
+
+            youtube_track = youtube_tracks[0]
+            user_dict[youtube_track.identifier] = interaction.user.mention
+
             if vc.queue.is_empty and vc.is_playing() is False:
-                await vc.play(partial)
-                limit = limit - 1
+                await vc.play(youtube_track)
+                limit -= 1
             else:
-                await vc.queue.put_wait(partial)
-            song_name = await nextwave.tracks.YouTubeTrack.search(partial.title)
-            user_dict[song_name[0].identifier] = interaction.user.mention
-            # Update the description of the embed with the current count
+                await vc.queue.put_wait(youtube_track)
+            
+            # Update the embed description with the current status
             if limit == 100:
-                queue_embed.description = f"Song no. `1` added to the track and remaining are being pushed to the **QUEUE**:`{vc.queue.count}/`**100**"
+                queue_embed.description = f"Song no. `1` added to the track and remaining are being pushed to the **QUEUE**:`{vc.queue.count}/100`"
             else:
-                queue_embed.description = f"Song no. `1` added to the track and remaining are being pushed to the **QUEUE**:`{vc.queue.count}/`**{limit}**"
-            await queueCompletion.edit(embed=queue_embed)
+                queue_embed.description = f"Song no. `{100 - limit + 1}` added to the track and remaining are being pushed to the **QUEUE**:`{vc.queue.count}/{limit}`"
+            await queue_completion.edit(embed=queue_embed)
 
         setattr(vc, "loop", False)
 
-        queue_embed.description = (
-            f"Total successfully added to the **QUEUE**: `{vc.queue.count}`"
-        )
-        await queueCompletion.edit(embed=queue_embed)
+        queue_embed.description = f"Total successfully added to the **QUEUE**: `{vc.queue.count}`"
+        await queue_completion.edit(embed=queue_embed)
 
     except spotify.SpotifyRequestError as e:
         await interaction.response.send_message(
             embed=nextcord.Embed(description=f"{e}", color=embed_color)
         )
-
 
 @commands.cooldown(1, 2, commands.BucketType.user)
 @bot.slash_command(name="pause", description="pauses the current playing track")
@@ -424,7 +425,7 @@ async def skip_command(interaction: interactions.Interaction):
     vc: nextwave.Player = interaction.guild.voice_client
 
     if vc.loop == True:
-        vclooptxt = "Disable the `LOOP` to skip | **,loop** again to disable the `LOOP` | Add a new song to disable the `LOOP`"
+        vclooptxt = "Disable the `LOOP` mode to skip\n**/loop** again to disable the `LOOP` mode\nAdding songs disables the `LOOP` mode"
         return await interaction.response.send_message(
             embed=nextcord.Embed(description=vclooptxt, color=embed_color),delete_after=5
         )
@@ -446,6 +447,7 @@ async def skip_command(interaction: interactions.Interaction):
         await interaction.response.send_message(
             embed=nextcord.Embed(description="`SKIPPED`!", color=embed_color),delete_after=5
         )
+        await queue_command(interaction)
 
 @commands.cooldown(1, 2, commands.BucketType.user)
 @bot.slash_command(
@@ -569,7 +571,6 @@ async def loop_command(interaction: interactions.Interaction):
             embed=nextcord.Embed(description="**LOOP**: `disabled`", color=embed_color), delete_after=5
         )
     )
-
 
 @commands.cooldown(1, 2, commands.BucketType.user)
 @bot.slash_command(
@@ -849,7 +850,7 @@ async def save_command(interaction: interactions.Interaction):
     user = await bot.fetch_user(interaction.user.id)
     if vc._source:
         await user.send(
-            embed=nextcord.Embed(description=f"`{vc._source}`", color=embed_color),delete_after=5
+            embed=nextcord.Embed(description=f"`{vc._source}`", color=embed_color)
         )
         song_saved = await interaction.response.send_message(
             embed=nextcord.Embed(description="**SONG** saved!", color=embed_color),delete_after=5
@@ -891,8 +892,89 @@ async def seek_command(interaction:interactions.Interaction, seekpos: int):
                     color=embed_color
                 ),delete_after=5
             )
+
+#autoplay command development
+from g4f.client import Client
+# from g4f.Provider import HuggingChat
+import nest_asyncio
+nest_asyncio.apply()
+
+client = Client()
+    # Get the seed for prediction
+
+
+@commands.cooldown(1, 5, commands.BucketType.user)
+@bot.slash_command(name="predict", description="Predict and add songs to the queue")
+@commands.has_role("tm")
+async def predict_command(interaction: nextcord.Interaction, num_songs: int):
+    if num_songs < 3 or num_songs > 10:
+        return await interaction.response.send_message(
+            embed=nextcord.Embed(
+                description="Please enter a number between 3 to 10 for predictions.",
+                color=embed_color
+            ),
+            delete_after=5
+        )
+
+    vc: nextwave.Player = interaction.guild.voice_client
+
+    if vc is None or not vc.is_connected():
+        return await interaction.response.send_message(
+            embed=nextcord.Embed(
+                description="The bot is not connected to a voice channel.",
+                color=embed_color
+            ),
+            delete_after=5
+        )
+
+    if vc.queue.is_empty and not vc.is_playing():
+        return await interaction.response.send_message(
+            embed=nextcord.Embed(
+                description="There's nothing currently playing or in the queue to base predictions on.",
+                color=embed_color
+            ),
+            delete_after=5
+        )
+
+    # Defer the response to avoid timeout
+    await interaction.response.defer()
+    # Get the seed for prediction
+    if vc.queue.is_empty:
+        seed_song = vc.track.title
+    else:
+        seed_song = f"{vc.queue} {vc.track.title}"
+
+    # Ask the AI to predict multiple songs at once
+    chat_completion = client.chat.completions.create(
+        # model="CodeLlama-70b-Instruct-hf",  # Ensure you use the correct model
+        model="gpt-4",
+        messages=[{"role": "user", "content": f'predict the next {num_songs} number of songs based on this list of song/s for the user, do not send long texts, here is the list - {seed_song}, IMPORTANT remember to seperate each preidicted songs by this ===='}]
+    )
     
+    response = chat_completion.choices[0].message.content
+    predicted_songs = response.split("====")
+
+    # Loop through each predicted song and use the play_command to add it to the queue
+    # print(seed_song)
+    # print(response)
+    # print(predicted_songs)
+    
+    for songs in predicted_songs:
+        # print(songs)
+        await play_command(interaction, search=songs)
+
+    # Send the final confirmation message after all songs have been added
+    await interaction.followup.send(
+        embed=nextcord.Embed(
+            description=f"Added {num_songs} predicted songs to the queue.",
+            color=embed_color
+        ),
+        delete_after=10
+    )
+
+
+
 """main"""
 
 if __name__ == "__main__":
-    bot.run(os.environ["tishmish_token"])
+    bot.run(os.environ["TOKEN"])
