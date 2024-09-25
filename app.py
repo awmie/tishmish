@@ -127,13 +127,13 @@ async def node_connect():
     await bot.wait_until_ready()
     await nextwave.NodePool.create_node(
         bot=bot,
-        host="v3.lavalink.rocks",
-        port=443,
-        password="horizxon.tech",
-        https=True,
+        host=os.getenv('LAVALINK_HOST'),
+        port=os.getenv('LAVALINK_PORT'),
+        password=os.getenv('LAVALINK_PASSWORD'),
+        https=os.getenv('LAVALINK_SECURE'),
         spotify_client=spotify.SpotifyClient(
-            client_id=os.environ['SPOTIFY_CLIENT_ID'],
-            client_secret=os.environ['SPOTIFY_CLIENT_SECRET'],
+            client_id=os.getenv('SPOTIFY_CLIENT_ID'),
+            client_secret=os.getenv('SPOTIFY_CLIENT_SECRET'),
         ),
     )
 
@@ -977,4 +977,4 @@ async def predict_command(interaction: nextcord.Interaction, num_songs: int):
 """main"""
 
 if __name__ == "__main__":
-    bot.run(os.environ["TOKEN"])
+    bot.run(os.getenv("TOKEN"))
