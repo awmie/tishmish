@@ -132,17 +132,22 @@ async def help(interaction: nextcord.Interaction, helpstr: str = nextcord.SlashO
     name='help_choices', description='Choose one of the help commands',
     required=False, choices={"member commands", "tm commands"}
 )):
-    # List of TM and Member commands
+    # List of TM and Member commands.
+    # This is a hand-maintained inventory and it had drifted from what the
+    # decorators actually enforce: /role is gated by the manage_roles permission
+    # and /spotifyplay is not gated at all (readme documents it as a normal
+    # command, and /play routes Spotify URLs into it). Neither belongs under
+    # "tm commands".
     commands_dict = {
         "tm commands": [
-            skip_command, del_command, move_command, clear_command, seek_command, 
-            volume_command, skipto_command, shuffle_command, loop_command, 
-            disconnect_command, loopqueue_command, set_role_command, 
-            spotifyplay_command, restart_command, predict_command
+            skip_command, del_command, move_command, clear_command, seek_command,
+            volume_command, skipto_command, shuffle_command, loop_command,
+            disconnect_command, loopqueue_command, restart_command,
+            predict_command
         ],
         "member commands": [
-            ping_command, play_command, pause_command, resume_command, 
-            nowplaying_command, queue_command, save_command
+            ping_command, play_command, pause_command, resume_command,
+            nowplaying_command, queue_command, save_command, spotifyplay_command
         ]
     }
 
@@ -171,6 +176,7 @@ async def help(interaction: nextcord.Interaction, helpstr: str = nextcord.SlashO
         embed.add_field(
             name="View more options with `/help +1 options`",
             value="To use TM commands, server owner/admin can provide **tm** role to the member\n"
+                  "Grant it with `/role` (requires the **Manage Roles** permission).\n"
                   "[Help](https://github.com/awmie/tishmish/blob/main/readme.md)",
         )
         await interaction.response.send_message(embed=embed)
