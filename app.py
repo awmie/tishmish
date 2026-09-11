@@ -8,7 +8,9 @@ import numpy as np
 import os
 import asyncio
 import datetime
+import sys
 import time
+import traceback
 
 # I N T E N T S
 intents = nextcord.Intents(messages=True, guilds=True)
@@ -57,7 +59,11 @@ def require_role(role_name=TM_ROLE):
             member = interaction.user
             if getattr(member, "bot", False) or interaction.guild is None:
                 return False
-            return any(role.name == role_name for role in member.roles)
+            if not any(role.name == role_name for role in member.roles):
+                raise nextcord.ApplicationCheckFailure(
+                    f"You need the **{role_name}** role to use `/{command.name}`."
+                )
+            return True
         command.add_check(predicate)
         return command
     return decorator
@@ -67,7 +73,11 @@ def require_owner():
     """Block unless the invoker is this bot's application owner."""
     def decorator(command):
         async def predicate(interaction):
-            return await bot.is_owner(interaction.user)
+            if not await bot.is_owner(interaction.user):
+                raise nextcord.ApplicationCheckFailure(
+                    "Only the owner of this bot can use that command."
+                )
+            return True
         command.add_check(predicate)
         return command
     return decorator
@@ -80,7 +90,12 @@ def require_permission(**permissions):
             if interaction.guild is None:
                 return False
             perms = interaction.user.guild_permissions
-            return all(getattr(perms, name, False) is True for name in permissions)
+            if not all(getattr(perms, name, False) is True for name in permissions):
+                wanted = " and ".join(p.replace("_", " ") for p in permissions)
+                raise nextcord.ApplicationCheckFailure(
+                    f"`/{command.name}` needs the **{wanted}** permission."
+                )
+            return True
         command.add_check(predicate)
         return command
     return decorator
@@ -99,7 +114,10 @@ def rate_limit(invocations, period):
             recent = [t for t in hits.get(interaction.user.id, ())
                       if now - t < period]
             if len(recent) >= invocations:
-                return False
+                raise nextcord.ApplicationCheckFailure(
+                    f"Slow down — `/{command.name}` allows {invocations} use"
+                    f"{'s' if invocations > 1 else ''} per {period}s."
+                )
             recent.append(now)
             hits[interaction.user.id] = recent
             return True
@@ -205,6 +223,47 @@ async def on_ready():
     )
 
 
+async def reply_quietly(interaction, description):
+    """Reply in a way that cannot itself fail.
+
+    An error handler that raises is worse than one that only logs: the second
+    exception escapes into event dispatch. Replying fails for entirely ordinary
+    reasons here -- the member dismissed the interaction, or the three second
+    window closed while a long command was still working.
+    """
+    try:
+        await interaction.send(
+            embed=nextcord.Embed(description=description, color=embed_color),
+            ephemeral=True,
+        )
+    except nextcord.DiscordException as exc:
+        member = getattr(getattr(interaction, "user", None), "id", "?")
+        print(f"could not report to member {member}: {exc!r}", file=sys.stderr)
+
+
+@bot.event
+async def on_application_command_error(interaction, error):
+    """Make refusals and failures visible.
+
+    nextcord's default handler only prints the traceback to stderr, so a blocked
+    or throttled command looked like a dead bot -- Discord reports an unanswered
+    interaction as "the application did not respond". Every gate here raises
+    ApplicationCheckFailure with a reason, which is forwarded to the member
+    ephemerally; anything unexpected is logged and answered generically.
+    """
+    if isinstance(error, nextcord.ApplicationCheckFailure):
+        await reply_quietly(
+            interaction, str(error) or "You cannot use that command right now."
+        )
+        return
+
+    print("ignoring exception in application command:", file=sys.stderr)
+    traceback.print_exception(type(error), error, error.__traceback__, file=sys.stderr)
+    # An expired interaction cannot be answered at all, and a command that threw
+    # after already replying must not turn one error into two.
+    await reply_quietly(interaction, "Something went wrong running that command.")
+
+
 @bot.event
 async def on_nextwave_node_ready(node: nextwave.Node):
     print(f"Node {node.identifier} connected successfully")
@@ -241,13 +300,24 @@ def env_flag(name):
 
 async def node_connect():
     await bot.wait_until_ready()
+    # Resolve the port once, outside the retry loop: it sat inside the try below,
+    # so a typo'd value raised ValueError, got swallowed as a connection failure,
+    # and retried forever with backoff instead of reporting a bad config.
+    try:
+        port = int(os.getenv('LAVALINK_PORT'))
+    except (TypeError, ValueError):
+        print(
+            f"LAVALINK_PORT is not a number ({os.getenv('LAVALINK_PORT')!r}); "
+            "not connecting to any node."
+        )
+        return
     delay = 5
     while True:
         try:
             await nextwave.NodePool.create_node(
                 bot=bot,
                 host=os.getenv('LAVALINK_HOST'),
-                port=int(os.getenv('LAVALINK_PORT')),
+                port=port,
                 password=os.getenv('LAVALINK_PASSWORD'),
                 https=env_flag('LAVALINK_SECURE'),
                 spotify_client=spotify.SpotifyClient(
@@ -416,7 +486,7 @@ async def on_nextwave_track_end(player: nextwave.Player, track: nextwave.Track, 
                 embed=nextcord.Embed(
                     description=f"**Now playing from the queue:**\n\n`{next_song.title}`",color=embed_color,
                     ),
-                delete_after=player.track.length / 1000
+                delete_after=max(5, player.track.length / 1000)
                 )
         else:
             await player.stop()
@@ -991,28 +1061,29 @@ async def save_command(interaction: interactions.Interaction):
             ),
             delete_after=5,
         )
-    # Acknowledge first. DMing before responding meant a user with DMs closed got
-    # neither the DM nor any reply, and the interaction just expired on them.
-    await interaction.send(
-        embed=nextcord.Embed(description="**SONG** saved!", color=embed_color),
-        delete_after=5,
-    )
     # vc._source is nextwave's private audio-source object; formatting it sent the
     # user a Python repr. vc.track is what /nowplaying already uses for title+uri.
     saved = nextcord.Embed(
         description=f"[`{vc.track.title}`]({str(vc.track.uri)})\n\n**Saved from** {interaction.guild.name}",
         color=embed_color,
     )
+    # DM first, then answer once with what actually happened. The original DM'd
+    # before responding at all, so a member with DMs closed raised out of the
+    # handler and left the interaction unanswered.
     try:
         await interaction.user.send(embed=saved)
     except nextcord.Forbidden:
-        await interaction.send(
+        return await interaction.send(
             embed=nextcord.Embed(
-                description="I could not DM you — enable direct messages from server members.",
+                description="I could not DM you — allow direct messages from "
+                            "server members and try again.",
                 color=embed_color,
-            ),
-            delete_after=10,
+            )
         )
+    await interaction.send(
+        embed=nextcord.Embed(description="**SONG** saved!", color=embed_color),
+        delete_after=5,
+    )
 
 @rate_limit(1, 2)
 @require_role("tm")
