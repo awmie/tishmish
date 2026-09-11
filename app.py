@@ -7,6 +7,7 @@ from nextwave.ext import spotify
 import numpy as np
 import os
 import datetime
+import time
 
 # I N T E N T S
 intents = nextcord.Intents(messages=True, guilds=True)
@@ -31,8 +32,85 @@ setattr(nextwave.Player, "lq", False)
 setattr(nextwave.Player, "autoplay", False)
 embed_color = nextcord.Color.from_rgb(128, 67, 255)
 
+# ---------------------------------------------------------------------------
+# Access control and rate limiting for slash (application) commands.
+#
+# nextcord's commands.has_role / is_owner / has_permissions / cooldown
+# decorators do NOT apply to slash commands. They stash their predicate on
+# __commands_checks__ / __commands_cooldown__, which application_command.py
+# never reads -- only ext.commands.Command consumes those. On a
+# @bot.slash_command the decorators are accepted silently and enforce nothing,
+# so every gate in this file read as enforced while all 24 commands were wide
+# open. ApplicationCommand.add_check() is the real hook: the predicate receives
+# the Interaction, and a falsy return blocks the command with
+# ApplicationCheckFailure.
+#
+# These decorators therefore sit ABOVE @bot.slash_command so they receive the
+# registered command object rather than the bare coroutine.
+# ---------------------------------------------------------------------------
+TM_ROLE = "tm"
+_RATE_PRUNE_AT = 4096
+
+
+def require_role(role_name=TM_ROLE):
+    """Block unless the invoking member holds role_name."""
+    def decorator(command):
+        async def predicate(interaction):
+            member = interaction.user
+            if getattr(member, "bot", False) or interaction.guild is None:
+                return False
+            return any(role.name == role_name for role in member.roles)
+        command.add_check(predicate)
+        return command
+    return decorator
+
+
+def require_owner():
+    """Block unless the invoker is this bot's application owner."""
+    def decorator(command):
+        async def predicate(interaction):
+            return await bot.is_owner(interaction.user)
+        command.add_check(predicate)
+        return command
+    return decorator
+
+
+def require_permission(**permissions):
+    """Block unless the invoking member holds every named guild permission."""
+    def decorator(command):
+        async def predicate(interaction):
+            if interaction.guild is None:
+                return False
+            perms = interaction.user.guild_permissions
+            return all(getattr(perms, name, False) is True for name in permissions)
+        command.add_check(predicate)
+        return command
+    return decorator
+
+
+def rate_limit(invocations, period):
+    """Fixed-window throttle: invocations starts per user per period seconds."""
+    hits = {}
+
+    def decorator(command):
+        async def predicate(interaction):
+            now = time.monotonic()
+            if len(hits) > _RATE_PRUNE_AT:
+                for k in [k for k, v in hits.items() if now - v[-1] >= period]:
+                    del hits[k]
+            recent = [t for t in hits.get(interaction.user.id, ())
+                      if now - t < period]
+            if len(recent) >= invocations:
+                return False
+            recent.append(now)
+            hits[interaction.user.id] = recent
+            return True
+        command.add_check(predicate)
+        return command
+    return decorator
+
 # # T I S M I S H help-command
-@commands.cooldown(1, 1, commands.BucketType.user)
+@rate_limit(1, 1)
 @bot.slash_command(name="help", description="All you need")
 async def help(interaction: nextcord.Interaction, helpstr: str = nextcord.SlashOption(
     name='help_choices', description='Choose one of the help commands',
@@ -85,12 +163,12 @@ async def help(interaction: nextcord.Interaction, helpstr: str = nextcord.SlashO
 
 # T I S H M I S H commands
 
-@commands.cooldown(1, 2, commands.BucketType.user)
+@rate_limit(1, 2)
+@require_permission(manage_roles=True)
 @bot.slash_command(
     name="role",
     description="sets an existing role which are below tishmish(role) for a user",
 )
-@commands.has_permissions(manage_roles=True)
 async def set_role_command(interaction: interactions.Interaction, user: nextcord.Member, role: nextcord.Role):
     if role.position > interaction.guild.me.top_role.position:
         return await interaction.response.send_message("I do not have permission to manage this role.", ephemeral=True)
@@ -137,10 +215,10 @@ async def node_connect():
         ),
     )
 
-@commands.cooldown(1, 2, commands.BucketType.user)
+@rate_limit(1, 2)
+@require_owner()
+@require_role("tm")
 @bot.slash_command(name="info", description="shows information about the bot")
-@commands.is_owner()
-@commands.has_role("tm")
 async def info_command(interaction: interactions.Interaction):
     await interaction.response.send_message(
         embed=nextcord.Embed(
@@ -150,12 +228,12 @@ async def info_command(interaction: interactions.Interaction):
     )
 
 
-@commands.cooldown(1, 2, commands.BucketType.user)
+@rate_limit(1, 2)
+@require_role("tm")
 @bot.slash_command(
     name="loopqueue",
     description="loops the queue",
 )
-@commands.has_role("tm")
 async def loopqueue_command(interaction: interactions.Interaction, type: str=nextcord.SlashOption(
     name="lq-options", description='options for loop queue', required=True, choices={"start","stop"}
 )):
@@ -193,7 +271,7 @@ async def loopqueue_command(interaction: interactions.Interaction, type: str=nex
         else:
             return ""
 
-@commands.cooldown(1, 2, commands.BucketType.user)
+@rate_limit(1, 2)
 @bot.slash_command(name="ping", description="displays bot's latency")
 async def ping_command(interaction: interactions.Interaction):
     em = nextcord.Embed(
@@ -202,7 +280,7 @@ async def ping_command(interaction: interactions.Interaction):
     await interaction.response.send_message(embed=em, delete_after=5)
 
 
-@commands.cooldown(1, 1, commands.BucketType.user)
+@rate_limit(1, 1)
 @bot.slash_command(
     name="play", description="plays the given track provided by the user"
 )
@@ -297,7 +375,7 @@ async def on_nextwave_track_end(player: nextwave.Player, track: nextwave.Track, 
         ) 
 
 
-@commands.cooldown(1, 1, commands.BucketType.user)
+@rate_limit(1, 1)
 @bot.slash_command(
     name="spotifyplay",
     description="plays the provided spotify playlist link up to the provided song number",
@@ -358,7 +436,7 @@ async def spotifyplay_command(
             embed=nextcord.Embed(description=f"{e}", color=embed_color)
         )
 
-@commands.cooldown(1, 2, commands.BucketType.user)
+@rate_limit(1, 2)
 @bot.slash_command(name="pause", description="pauses the current playing track")
 async def pause_command(interaction: interactions.Interaction):
     if await user_connectivity(interaction) == False:
@@ -388,7 +466,7 @@ async def pause_command(interaction: interactions.Interaction):
         )
 
 
-@commands.cooldown(1, 2, commands.BucketType.user)
+@rate_limit(1, 2)
 @bot.slash_command(name="resume", description="resumes the paused track")
 async def resume_command(interaction: interactions.Interaction):
     if await user_connectivity(interaction) == False:
@@ -416,9 +494,9 @@ async def resume_command(interaction: interactions.Interaction):
         )
 
 
-@commands.cooldown(1, 2, commands.BucketType.user)
+@rate_limit(1, 2)
+@require_role("tm")
 @bot.slash_command(name="skip", description="skips to the next track")
-@commands.has_role("tm")
 async def skip_command(interaction: interactions.Interaction):
     if await user_connectivity(interaction) == False:
         return
@@ -449,12 +527,12 @@ async def skip_command(interaction: interactions.Interaction):
         )
         await queue_command(interaction)
 
-@commands.cooldown(1, 2, commands.BucketType.user)
+@rate_limit(1, 2)
+@require_role("tm")
 @bot.slash_command(
     name="disconnect",
     description="disconnects the player from the vc",
 )
-@commands.has_role("tm")
 async def disconnect_command(interaction: interactions.Interaction):
     if await user_connectivity(interaction) == False:
         return
@@ -490,7 +568,7 @@ async def on_voice_state_update(member, before, after):
                 await vc.disconnect(force=True)
                 break
 
-@commands.cooldown(1, 2, commands.BucketType.user)
+@rate_limit(1, 2)
 @bot.slash_command(
     name="nowplaying",
     description="shows the current track information",
@@ -544,12 +622,12 @@ async def nowplaying_command(interaction: interactions.Interaction):
     return await interaction.response.send_message(embed=em, delete_after=10)
 
 
-@commands.cooldown(1, 2, commands.BucketType.user)
+@rate_limit(1, 2)
+@require_role("tm")
 @bot.slash_command(
     name="loop",
     description="loop / exitloop",
 )
-@commands.has_role("tm")
 async def loop_command(interaction: interactions.Interaction):
     if await user_connectivity(interaction) == False:
         return
@@ -572,7 +650,7 @@ async def loop_command(interaction: interactions.Interaction):
         )
     )
 
-@commands.cooldown(1, 2, commands.BucketType.user)
+@rate_limit(1, 2)
 @bot.slash_command(
     name="queue",
     description="displays the current queue",
@@ -598,12 +676,12 @@ async def queue_command(interaction: interactions.Interaction):
     )
 )
 
-@commands.cooldown(1, 2, commands.BucketType.user)
+@rate_limit(1, 2)
+@require_role("tm")
 @bot.slash_command(
     name="shuffle",
     description="shuffles the existing queue randomly",
 )
-@commands.has_role("tm")
 async def shuffle_command(interaction: interactions.Interaction):
     if await user_connectivity(interaction) == False:
         return
@@ -626,12 +704,12 @@ async def shuffle_command(interaction: interactions.Interaction):
         )
 
 
-@commands.cooldown(1, 2, commands.BucketType.user)
+@rate_limit(1, 2)
+@require_role("tm")
 @bot.slash_command(
     name="del",
     description="deletes the specified track",
 )
-@commands.has_role("tm")
 async def del_command(interaction: interactions.Interaction, position: int):
     if await user_connectivity(interaction) == False:
         return
@@ -666,12 +744,12 @@ async def del_command(interaction: interactions.Interaction, position: int):
         )
 
 
-@commands.cooldown(1, 2, commands.BucketType.user)
+@rate_limit(1, 2)
+@require_role("tm")
 @bot.slash_command(
     name="skipto",
     description="skips to the specified track",
 )
-@commands.has_role("tm")
 async def skipto_command(interaction: interactions.Interaction, position: int):
     if await user_connectivity(interaction) == False:
         return
@@ -707,12 +785,12 @@ async def skipto_command(interaction: interactions.Interaction, position: int):
         return await skip_command(interaction)
 
 
-@commands.cooldown(1, 2, commands.BucketType.user)
+@rate_limit(1, 2)
+@require_role("tm")
 @bot.slash_command(
     name="move",
     description="moves the track to the specified position",
 )
-@commands.has_role("tm")
 async def move_command(
     interaction: interactions.Interaction, song_position: int, move_position: int
 ):
@@ -762,9 +840,9 @@ async def move_command(
             ),delete_after=5
         )
 
-@commands.cooldown(1, 2, commands.BucketType.user)
+@rate_limit(1, 2)
+@require_role("tm")
 @bot.slash_command(name="volume", description="sets the volume")
-@commands.has_role("tm")
 async def volume_command(interaction: interactions.Interaction, playervolume: int):
     if await user_connectivity(interaction) == False:
         return
@@ -797,9 +875,9 @@ async def volume_command(interaction: interactions.Interaction, playervolume: in
 
 
 
-@commands.cooldown(1, 2, commands.BucketType.user)
+@rate_limit(1, 2)
+@require_role("tm")
 @bot.slash_command(name="restart", description="restarts the song")
-@commands.has_role("tm")
 async def restart_command(interaction: interactions.Interaction):
     if await user_connectivity(interaction) == False:
         return
@@ -815,11 +893,11 @@ async def restart_command(interaction: interactions.Interaction):
         
 
 
-@commands.cooldown(1, 5, commands.BucketType.user)
+@rate_limit(1, 5)
+@require_role("tm")
 @bot.slash_command(
     name="clear", description="clears the queue"
 )
-@commands.has_role("tm")
 async def clear_command(interaction: interactions.Interaction):
     vc: nextwave.Player = interaction.guild.voice_client
     if await user_connectivity(interaction) == False:
@@ -838,7 +916,7 @@ async def clear_command(interaction: interactions.Interaction):
     return await interaction.response.send_message(embed=clear_command_embed, delete_after=5)
 
 
-@commands.cooldown(1, 2, commands.BucketType.user)
+@rate_limit(1, 2)
 @bot.slash_command(
     name="save",
     description="dms the current or specified song to the user",
@@ -864,9 +942,9 @@ async def save_command(interaction: interactions.Interaction):
             ),delete_after=5
         )
 
-@commands.cooldown(1,2,commands.BucketType.user)
+@rate_limit(1, 2)
+@require_role("tm")
 @bot.slash_command(name="seek", description="seeks to the specified position for eg. 30sec")
-@commands.has_role("tm")
 async def seek_command(interaction:interactions.Interaction, seekpos: int):
     if await user_connectivity(interaction) == False:
         return 
@@ -903,9 +981,9 @@ client = Client()
     # Get the seed for prediction
 
 
-@commands.cooldown(1, 5, commands.BucketType.user)
+@rate_limit(1, 5)
+@require_role("tm")
 @bot.slash_command(name="predict", description="Predict and add songs to the queue")
-@commands.has_role("tm")
 async def predict_command(interaction: nextcord.Interaction, num_songs: int):
     if num_songs < 3 or num_songs > 10:
         return await interaction.response.send_message(
