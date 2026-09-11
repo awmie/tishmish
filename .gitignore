@@ -1,2 +1,20 @@
 .env
 .DS_Store
+
+# virtualenvs (the old `venv` line never matched venv310/311/312)
+venv/
+venv*/
+.venv/
+
+# build artifacts
+__pycache__/
+*.py[cod]
+
+# local tooling state
+.claude-flow/
+.swarm/
+.ruvector/
+ruvector.db
+.ruff_cache/
+*.rvf
+*.rvf.lock

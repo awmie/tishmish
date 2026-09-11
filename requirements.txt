@@ -1,6 +1,10 @@
-nextcord
-numpy
+# Pinned to the versions in venv311, the env matching runtime.txt.
+# nextwave is NOT on PyPI (https://pypi.org/pypi/nextwave -> 404), so this
+# file cannot be installed as-is: restore nextwave from wherever it was
+# vendored before deploying, then pin it too.
+nextcord==2.6.0
+numpy==2.4.2
+g4f==7.2.2
+nest_asyncio==1.6.0
+curl_cffi==0.14.0
 nextwave
-g4f
-nest_asyncio
-curl_cffi

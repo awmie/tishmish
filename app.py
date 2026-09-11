@@ -6,6 +6,7 @@ import nextwave
 from nextwave.ext import spotify
 import numpy as np
 import os
+import asyncio
 import datetime
 import time
 
@@ -16,8 +17,6 @@ intents.members = True
 intents.message_content = True
 intents.voice_states = True
 intents.emojis_and_stickers = True
-all_intents = intents.all()
-all_intents = True
 
 bot = commands.Bot(
     intents=intents,
@@ -25,7 +24,6 @@ bot = commands.Bot(
 )
 # some useful variables
 
-global user_arr, user_dict
 user_dict = {}
 user_arr = np.array([])
 setattr(nextwave.Player, "lq", False)
@@ -173,7 +171,10 @@ async def set_role_command(interaction: interactions.Interaction, user: nextcord
     if role.position > interaction.guild.me.top_role.position:
         return await interaction.response.send_message("I do not have permission to manage this role.", ephemeral=True)
     if role.position > user.top_role.position:
-        return await interaction.response.send_message("You do not have permission to manage this role.", ephemeral=True)
+        return await interaction.response.send_message(
+            f"`{user.name}` outranks that role, so it cannot be added to them.",
+            ephemeral=True,
+        )
     await user.add_roles(role)
     embed = nextcord.Embed(
         description=f"`{user.name}` has been given a role called: **{role.name}**",
@@ -184,8 +185,16 @@ async def set_role_command(interaction: interactions.Interaction, user: nextcord
 #checks for user connection to voice channels
 async def user_connectivity(interaction: interactions.Interaction):
     if not interaction.user.voice:
-        await interaction.response.send_message("Join a voice channel first!")
+        await interaction.send("Join a voice channel first!")
         return False
+    # Every caller reads interaction.guild.voice_client right after this returns
+    # and then indexes into vc.queue / vc._source, so the member being in voice is
+    # only half the precondition: if the bot itself is not connected the player is
+    # None and those commands die with AttributeError instead of telling anyone.
+    if interaction.guild.voice_client is None:
+        await interaction.send("I am not connected to a voice channel!")
+        return False
+    return True
 
 @bot.event
 async def on_ready():
@@ -201,19 +210,58 @@ async def on_nextwave_node_ready(node: nextwave.Node):
     print(f"Node {node.identifier} connected successfully")
 
 
+REQUIRED_ENV = (
+    "TOKEN",
+    "LAVALINK_HOST",
+    "LAVALINK_PORT",
+    "LAVALINK_PASSWORD",
+    "SPOTIFY_CLIENT_ID",
+    "SPOTIFY_CLIENT_SECRET",
+)
+
+
+def missing_env():
+    """Names in REQUIRED_ENV that are unset or empty.
+
+    Each was read with a bare os.getenv and no default, so a missing or typo'd
+    variable reached nextcord as None -- an opaque traceback, or a bot that
+    logged in, looked alive, and had no audio backend.
+    """
+    return [name for name in REQUIRED_ENV if not os.getenv(name)]
+
+
+def env_flag(name):
+    """Parse an env var as a bool.
+
+    https= received the raw string before, so LAVALINK_SECURE="false" was
+    truthy and asked for an encrypted node connection from someone who opted out.
+    """
+    return (os.getenv(name) or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
 async def node_connect():
     await bot.wait_until_ready()
-    await nextwave.NodePool.create_node(
-        bot=bot,
-        host=os.getenv('LAVALINK_HOST'),
-        port=os.getenv('LAVALINK_PORT'),
-        password=os.getenv('LAVALINK_PASSWORD'),
-        https=os.getenv('LAVALINK_SECURE'),
-        spotify_client=spotify.SpotifyClient(
-            client_id=os.getenv('SPOTIFY_CLIENT_ID'),
-            client_secret=os.getenv('SPOTIFY_CLIENT_SECRET'),
-        ),
-    )
+    delay = 5
+    while True:
+        try:
+            await nextwave.NodePool.create_node(
+                bot=bot,
+                host=os.getenv('LAVALINK_HOST'),
+                port=int(os.getenv('LAVALINK_PORT')),
+                password=os.getenv('LAVALINK_PASSWORD'),
+                https=env_flag('LAVALINK_SECURE'),
+                spotify_client=spotify.SpotifyClient(
+                    client_id=os.getenv('SPOTIFY_CLIENT_ID'),
+                    client_secret=os.getenv('SPOTIFY_CLIENT_SECRET'),
+                ),
+            )
+            return
+        except Exception as exc:
+            # Ran as a bare create_task before, so a Lavalink outage killed the
+            # task and nothing retried: the bot stayed up with no node forever.
+            print(f"lavalink node connect failed: {exc!r}; retrying in {delay}s")
+            await asyncio.sleep(delay)
+            delay = min(delay * 2, 300)
 
 @rate_limit(1, 2)
 @require_owner()
@@ -237,17 +285,28 @@ async def info_command(interaction: interactions.Interaction):
 async def loopqueue_command(interaction: interactions.Interaction, type: str=nextcord.SlashOption(
     name="lq-options", description='options for loop queue', required=True, choices={"start","stop"}
 )):
+    if await user_connectivity(interaction) == False:
+        return
     vc: nextwave.Player = interaction.guild.voice_client
     if vc.queue.is_empty:
-        return await interaction.response.send_message(
+        return await interaction.send(
             embed=nextcord.Embed(
                 description="Unable to loop `QUEUE`, try adding more songs..",
                 color=embed_color,
             )
         )
-    if vc.lq == False and type == "start":
+    # The two original conditions were `lq is False and type == "start"` and
+    # `lq is True and type == "stop"`, so asking to start an already-looping
+    # queue matched neither and the command ended without ever replying.
+    if type == "start":
+        if vc.lq:
+            return await interaction.send(
+                embed=nextcord.Embed(
+                    description="**loopqueue** is already `enabled`", color=embed_color
+                )
+            )
         vc.lq = True
-        await interaction.response.send_message(
+        await interaction.send(
             embed=nextcord.Embed(
                 description="**loopqueue**: `enabled`", color=embed_color
             )
@@ -255,21 +314,23 @@ async def loopqueue_command(interaction: interactions.Interaction, type: str=nex
         try:
             if vc._source not in vc.queue:
                 vc.queue.put(vc._source)
-            else:
-                """"""
-        except Exception:
-            return ""
-    if vc.lq == True and type == "stop":
-        vc.lq = False
-        await interaction.response.send_message(
+        except Exception as exc:
+            print(f"loopqueue: could not requeue the current source: {exc!r}")
+        return
+    if not vc.lq:
+        return await interaction.send(
             embed=nextcord.Embed(
-                description="**loopqueue**: `disabled`", color=embed_color
+                description="**loopqueue** is already `disabled`", color=embed_color
             )
         )
-        if vc.queue.count == 1 and vc.queue._queue[0] == vc._source:
-            del vc.queue._queue[0]
-        else:
-            return ""
+    vc.lq = False
+    await interaction.send(
+        embed=nextcord.Embed(
+            description="**loopqueue**: `disabled`", color=embed_color
+        )
+    )
+    if vc.queue.count == 1 and vc.queue._queue[0] == vc._source:
+        del vc.queue._queue[0]
 
 @rate_limit(1, 2)
 @bot.slash_command(name="ping", description="displays bot's latency")
@@ -286,7 +347,7 @@ async def ping_command(interaction: interactions.Interaction):
 )
 async def play_command(interaction: interactions.Interaction, *, search: str):
     if not interaction.user.voice:
-        return await interaction.response.send_message("Join a voice channel first!")
+        return await interaction.send("Join a voice channel first!")
     elif not interaction.guild.voice_client:
         vc: nextwave.Player = await interaction.user.voice.channel.connect(
             cls=nextwave.Player
@@ -304,13 +365,13 @@ async def play_command(interaction: interactions.Interaction, *, search: str):
             search = search.replace("https://www.youtube.com/","")
             search = f"https://www.youtube.com/watch?v={search}"
     except Exception:
-        return await interaction.response.send_message(embed=nextcord.Embed(description="Invalid Spotify URL", color=embed_color))
+        return await interaction.send(embed=nextcord.Embed(description="Invalid Spotify URL", color=embed_color))
         
     search_results = await nextwave.tracks.YouTubeTrack.search(search)
     first_track = search_results[0] # Get the first track from the list
     if vc.queue.is_empty and vc.is_playing() is False:
         
-        playString = await interaction.response.send_message(
+        playString = await interaction.send(
             embed=nextcord.Embed(description="**searching...**", color=embed_color)
         )
         
@@ -355,7 +416,7 @@ async def on_nextwave_track_end(player: nextwave.Player, track: nextwave.Track, 
                 embed=nextcord.Embed(
                     description=f"**Now playing from the queue:**\n\n`{next_song.title}`",color=embed_color,
                     ),
-                delete_after=player.track.length
+                delete_after=player.track.length / 1000
                 )
         else:
             await player.stop()
@@ -384,7 +445,7 @@ async def spotifyplay_command(
     interaction: interactions.Interaction, search: str, limit: int = 100
 ):
     if not interaction.user.voice:
-        return await interaction.response.send_message("Join a voice channel first!")
+        return await interaction.send("Join a voice channel first!")
 
     vc: nextwave.Player = (
         interaction.guild.voice_client
@@ -396,7 +457,7 @@ async def spotifyplay_command(
         queue_embed = nextcord.Embed(
             description="initializing the **QUEUE**...", color=embed_color
         )
-        queue_completion = await interaction.response.send_message(embed=queue_embed)
+        queue_completion = await interaction.send(embed=queue_embed)
         
         # Iterate over the tracks
         async for partial in spotify.SpotifyTrack.iterator(
@@ -432,7 +493,7 @@ async def spotifyplay_command(
         await queue_completion.edit(embed=queue_embed)
 
     except spotify.SpotifyRequestError as e:
-        await interaction.response.send_message(
+        await interaction.send(
             embed=nextcord.Embed(description=f"{e}", color=embed_color)
         )
 
@@ -585,10 +646,8 @@ async def nowplaying_command(interaction: interactions.Interaction):
     # vcloop conditions
     loopstr = "enabled" if vc.loop else "disabled"
     state = "paused" if vc.is_paused() else "playing"
-    """numpy array usertag indexing"""
-    global user_list
-    user_list = list(user_dict.items())
-    user_arr = np.array(user_list)
+    # numpy array usertag indexing
+    user_arr = np.array(list(user_dict.items()))
     song_index = np.flatnonzero(
         np.char.find(user_arr, vc.track.identifier) == 0
     )
@@ -611,7 +670,7 @@ async def nowplaying_command(interaction: interactions.Interaction):
     )
     em.add_field(
         name="**Song Info**",
-        value=f"• Author: `{vc.track.author}`\n• Duration: `{str(datetime.timedelta(seconds=vc.track.length))}`",
+        value=f"• Author: `{vc.track.author}`\n• Duration: `{str(datetime.timedelta(milliseconds=vc.track.length))}`",
     )
     em.add_field(
         name="**Player Info**",
@@ -661,7 +720,7 @@ async def queue_command(interaction: interactions.Interaction):
     vc: nextwave.Player = interaction.guild.voice_client
 
     if vc.queue.is_empty:
-        return await interaction.response.send_message(
+        return await interaction.send(
             embed=nextcord.Embed(description="**QUEUE**\n\n`empty`", color=embed_color)
         )
     
@@ -669,7 +728,7 @@ async def queue_command(interaction: interactions.Interaction):
     
     song_array = np.array([(i+1, song.title if isinstance(song, nextwave.tracks.PartialTrack) else song.info["title"]) for i, song in enumerate(vc.queue, start=0)])
 
-    await interaction.response.send_message(embed=nextcord.Embed(
+    await interaction.send(embed=nextcord.Embed(
         title=f"**QUEUE [total song count:{vc.queue.count}]**\n\n**loopqueue**: {lqstr}",
         description="\n".join([f"**{i}**. {song}" for i, song in song_array]),
         color=embed_color
@@ -899,9 +958,9 @@ async def restart_command(interaction: interactions.Interaction):
     name="clear", description="clears the queue"
 )
 async def clear_command(interaction: interactions.Interaction):
-    vc: nextwave.Player = interaction.guild.voice_client
     if await user_connectivity(interaction) == False:
         return
+    vc: nextwave.Player = interaction.guild.voice_client
     if vc.queue.is_empty:
         return await interaction.response.send_message(
             embed=nextcord.Embed(
@@ -922,24 +981,37 @@ async def clear_command(interaction: interactions.Interaction):
     description="dms the current or specified song to the user",
 )
 async def save_command(interaction: interactions.Interaction):
-    vc: nextwave.Player = interaction.guild.voice_client
     if await user_connectivity(interaction) == False:
         return
-    user = await bot.fetch_user(interaction.user.id)
-    if vc._source:
-        await user.send(
-            embed=nextcord.Embed(description=f"`{vc._source}`", color=embed_color)
-        )
-        song_saved = await interaction.response.send_message(
-            embed=nextcord.Embed(description="**SONG** saved!", color=embed_color),delete_after=5
-        )
-        await song_saved.delete(delay=5)
-        
-    else:
-        return await interaction.response.send_message(
+    vc: nextwave.Player = interaction.guild.voice_client
+    if not vc.track:
+        return await interaction.send(
             embed=nextcord.Embed(
                 description="There is no `song` | `queue` available", color=embed_color
-            ),delete_after=5
+            ),
+            delete_after=5,
+        )
+    # Acknowledge first. DMing before responding meant a user with DMs closed got
+    # neither the DM nor any reply, and the interaction just expired on them.
+    await interaction.send(
+        embed=nextcord.Embed(description="**SONG** saved!", color=embed_color),
+        delete_after=5,
+    )
+    # vc._source is nextwave's private audio-source object; formatting it sent the
+    # user a Python repr. vc.track is what /nowplaying already uses for title+uri.
+    saved = nextcord.Embed(
+        description=f"[`{vc.track.title}`]({str(vc.track.uri)})\n\n**Saved from** {interaction.guild.name}",
+        color=embed_color,
+    )
+    try:
+        await interaction.user.send(embed=saved)
+    except nextcord.Forbidden:
+        await interaction.send(
+            embed=nextcord.Embed(
+                description="I could not DM you — enable direct messages from server members.",
+                color=embed_color,
+            ),
+            delete_after=10,
         )
 
 @rate_limit(1, 2)
@@ -955,7 +1027,7 @@ async def seek_command(interaction:interactions.Interaction, seekpos: int):
         )    
     
     else:
-        if seekpos < 0 or seekpos > vc.track.length:
+        if seekpos < 0 or seekpos * 1000 > vc.track.length:
             return await interaction.response.send_message(
                 embed=nextcord.Embed(
                     description=f"SEEK length `{seekpos}` outta range",
@@ -1055,4 +1127,9 @@ async def predict_command(interaction: nextcord.Interaction, num_songs: int):
 """main"""
 
 if __name__ == "__main__":
+    _missing = missing_env()
+    if _missing:
+        raise SystemExit(
+            "missing required environment variable(s): " + ", ".join(_missing)
+        )
     bot.run(os.getenv("TOKEN"))
