@@ -1,10 +1,24 @@
-# Pinned to the versions in venv311, the env matching runtime.txt.
-# nextwave is NOT on PyPI (https://pypi.org/pypi/nextwave -> 404), so this
-# file cannot be installed as-is: restore nextwave from wherever it was
-# vendored before deploying, then pin it too.
+# Runtime dependencies for app.py, pinned to what venv311 actually runs
+# (Python 3.11.15). Verify with: pip download -r requirements.txt --no-deps -d /tmp/x
+#
+# nextwave is GONE. It was never on PyPI (pypi.org/pypi/nextwave -> 404, it only
+# ever existed on TestPyPI) and, being a re-shim of wavelink 1.3.1, it cannot
+# carry Discord's DAVE/E2EE voice requirement: Lavalink closes the voice socket
+# with code 4017 "E2EE/DAVE protocol required" for any client that does not send
+# the voice-state channelId field. The bot now speaks Lavalink v4 through mafic.
+#
+# numpy is also gone: the requester bookkeeping that needed it was replaced by a
+# per-guild dict in GuildState.
+#
+# nextcord 2.6.0 is published sdist-only and imports pkg_resources at import time
+# (nextcord/__init__.py:43 -> health_check.py:5). setuptools 81 removed
+# pkg_resources, so without the pin below a fresh deploy fails at `import
+# nextcord` -- which is how this file was un-installable before, independent of
+# nextwave.
+setuptools<81
 nextcord==2.6.0
-numpy==2.4.2
+mafic==2.11.0
+aiohttp==3.13.3
 g4f==7.2.2
 nest_asyncio==1.6.0
 curl_cffi==0.14.0
-nextwave

@@ -18,3 +18,8 @@ ruvector.db
 .ruff_cache/
 *.rvf
 *.rvf.lock
+
+# local agent/tool state and stray files - not part of the bot
+.claude/
+.commandcode/
+WSH.kt
