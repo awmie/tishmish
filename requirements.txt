@@ -7,8 +7,9 @@
 # with code 4017 "E2EE/DAVE protocol required" for any client that does not send
 # the voice-state channelId field. The bot now speaks Lavalink v4 through mafic.
 #
-# numpy is also gone: the requester bookkeeping that needed it was replaced by a
-# per-guild dict in GuildState.
+# numpy is back, for /visualizer: it FFTs the track audio into a real spectrum.
+# That path also shells out to the `yt-dlp` and `ffmpeg` BINARIES, which must be
+# on PATH (they are not Python deps and are not installed here).
 #
 # nextcord 2.6.0 is published sdist-only and imports pkg_resources at import time
 # (nextcord/__init__.py:43 -> health_check.py:5). setuptools 81 removed
@@ -22,3 +23,4 @@ aiohttp==3.13.3
 g4f==7.2.2
 nest_asyncio==1.6.0
 curl_cffi==0.14.0
+numpy==2.4.2

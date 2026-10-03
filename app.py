@@ -557,7 +557,8 @@ async def help(interaction: nextcord.Interaction, helpstr: str = nextcord.SlashO
         ],
         "member commands": [
             ping_command, play_command, pause_command, resume_command,
-            nowplaying_command, queue_command, save_command, spotifyplay_command
+            nowplaying_command, queue_command, save_command, spotifyplay_command,
+            visualizer_command
         ]
     }
 
@@ -868,7 +869,14 @@ async def on_track_end(event):
     if not player.is_connected():
         return
     if player.state.loop_track:
-        return await player.play(track)
+        # start_time=0 is load-bearing, not decoration. `track` is the track from
+        # the END event, and Lavalink encodes that one with the position it
+        # stopped at: a 199s track arrived here encoded with position=198360.
+        # Replaying it unchanged made every /loop restart 0.64s before the end,
+        # finish instantly, and restart again -- an unthrottled replay storm that
+        # hit the node ~72 times in 30s until the member disconnected. Starting
+        # at 0 replays the song instead of its final tick.
+        return await player.play(track, start_time=0)
     await _advance_queue(player, finished=track)
 
 
@@ -1361,7 +1369,11 @@ async def _advance_queue(player, finished=None):
             # False, not None-with-a-silent-caller: /skip needs to know that
             # nothing was left so it can say so instead of claiming a skip.
             return False
-        await player.play(next_song)
+        # start_time=0 matters here for the same reason as the /loop replay:
+        # /loopqueue rotates the FINISHED track -- encoded with its end position
+        # -- back onto the queue, so a rotated track would otherwise start at its
+        # last tick too.
+        await player.play(next_song, start_time=0)
         if channel is not None:
             await channel.send(
                 embed=nextcord.Embed(
@@ -1701,6 +1713,593 @@ def _queue_rows_embed(interaction, state, title_extra=""):
     )
 
 
+# ---------------------------------------------------------------------------
+# Music visualiser -- real audio, not a fake wave
+# ---------------------------------------------------------------------------
+# Lavalink never hands the client audio (no PCM stream, no FFT), so the bot
+# fetches the track itself with yt-dlp, decodes it to raw mono PCM with ffmpeg
+# and FFTs it -- then the panel is drawn from the ACTUAL spectrum at the current
+# playback position. Analysis is cached per track id, so replays and loops are
+# instant. If a source cannot be fetched the panel says so instead of pretending.
+def _visualizer_interval():
+    """Seconds between panel edits, TISHMISH_VIS_INTERVAL to override.
+
+    Discord rate-limits message edits to roughly 5 per 5s per channel (about one
+    per second sustainable), and that bucket is shared with the bot's other
+    sends in the channel. Going faster does not produce more frames -- nextcord
+    just sleeps on the 429 -- and it can starve command replies, so the floor is
+    clamped rather than left to a bad env value.
+    """
+    try:
+        value = float(os.getenv("TISHMISH_VIS_INTERVAL", "1.0"))
+    except (TypeError, ValueError):
+        value = 1.0
+    return max(0.5, min(10.0, value))
+
+
+VISUALIZER_INTERVAL = _visualizer_interval()
+VIS_BANDS = 32                 # spectrum columns
+VIS_PANEL_ROWS = 7             # 2 spectrum rows + 5 waveform rows
+_VIS_RAMP = "▁▂▃▄▅▆▇█"
+_ANALYSIS_RATE = 8000          # Hz, mono
+_ANALYSIS_HOP = 400            # 50 ms between spectrum frames
+_ANALYSIS_WIN = 1024           # FFT window
+_ANALYSIS_WAVE_RATE = 2000     # Hz kept for the oscilloscope
+_ANALYSIS_WAVE_CUTOFF = 300.0  # low-pass so the wave is musical, not cymbals
+_ANALYSIS_MAX_SECONDS = 900
+_ANALYSIS_TIMEOUT = 120.0
+_ANALYSIS_CACHE_MAX = 6
+_ANALYSIS_SEM = asyncio.Semaphore(2)
+_SPINNER = "|/-\\"
+
+# guild_id -> _Visualizer
+_VISUALIZERS = {}
+# track key -> _Analysis
+_ANALYSIS_CACHE = {}
+
+
+class _Analysis:
+    """Decoded, precomputed features for one track."""
+
+    __slots__ = ("bands", "wave", "rate", "hop", "wave_rate")
+
+    def __init__(self, bands, wave, rate, hop, wave_rate):
+        self.bands = bands        # (frames, VIS_BANDS) float32, normalised 0..1
+        self.wave = wave          # int16 band-limited waveform for the scope
+        self.rate = rate
+        self.hop = hop
+        self.wave_rate = wave_rate
+
+
+class _Visualizer:
+    """State for one guild's live panel."""
+
+    __slots__ = ("task", "message", "channel_id", "track_key", "last_position",
+                 "last_text", "paused", "analysis", "analysis_failed",
+                 "analysis_task", "spinner")
+
+    def __init__(self, task=None, message=None, channel_id=None):
+        self.task = task
+        # The Message object itself, not a (channel_id, message_id) pair: the
+        # panel is posted in the voice channel's text chat, and nextcord models
+        # that as a VoiceChannel, which has no get_partial_message -- the exact
+        # AttributeError that killed the first version on its first edit.
+        self.message = message
+        # Where to re-post the panel when playback resumes after silence.
+        self.channel_id = channel_id
+        self.track_key = None
+        self.last_position = 0.0
+        self.last_text = None
+        self.paused = False
+        self.analysis = None
+        self.analysis_failed = False
+        self.analysis_task = None
+        self.spinner = 0
+
+
+def _vis_time(seconds):
+    seconds = max(0, int(seconds))
+    minutes, secs = divmod(seconds, 60)
+    hours, minutes = divmod(minutes, 60)
+    return f"{hours}:{minutes:02d}:{secs:02d}" if hours else f"{minutes}:{secs:02d}"
+
+
+def _audio_url(track):
+    """The URL yt-dlp should fetch: the track's own uri when it has one, else a
+    YouTube watch URL rebuilt from the video id."""
+    uri = str(getattr(track, "uri", "") or "")
+    if uri.startswith("http"):
+        return uri
+    identifier = getattr(track, "identifier", None)
+    source = str(getattr(track, "source", "") or "").lower()
+    if identifier and "youtube" in source:
+        return f"https://www.youtube.com/watch?v={identifier}"
+    return None
+
+
+async def _decode_audio(url):
+    """yt-dlp -> ffmpeg -> raw mono PCM, or None on any failure (missing binary,
+    network error, unsupported source).
+
+    The media is pulled into memory first and handed to ffmpeg on its stdin:
+    asyncio subprocesses cannot take another subprocess's StreamReader as their
+    stdin, so a direct yt-dlp|ffmpeg pipe is not available here.
+    """
+    try:
+        ytdlp = await asyncio.create_subprocess_exec(
+            "yt-dlp", "-f", "bestaudio/best", "-o", "-", "--no-playlist",
+            "--no-warnings", "-q", "--no-progress",
+            # The default web clients hand back media URLs that 403 today; the
+            # mweb client still serves a playable stream. Verified on this node.
+            "--extractor-args", "youtube:player_client=mweb",
+            url,
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,
+        )
+    except (FileNotFoundError, NotImplementedError):
+        return None
+    try:
+        media = await asyncio.wait_for(ytdlp.stdout.read(), _ANALYSIS_TIMEOUT)
+    except asyncio.TimeoutError:
+        media = b""
+    finally:
+        if ytdlp.returncode is None:
+            ytdlp.kill()
+        await ytdlp.wait()
+    if not media:
+        return None
+
+    try:
+        ffmpeg = await asyncio.create_subprocess_exec(
+            "ffmpeg", "-hide_banner", "-loglevel", "error", "-i", "pipe:0",
+            "-f", "s16le", "-ac", "1", "-ar", str(_ANALYSIS_RATE), "pipe:1",
+            stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+    except (FileNotFoundError, NotImplementedError):
+        return None
+    try:
+        raw, _ = await asyncio.wait_for(ffmpeg.communicate(media), _ANALYSIS_TIMEOUT)
+    except asyncio.TimeoutError:
+        if ffmpeg.returncode is None:
+            ffmpeg.kill()
+        await ffmpeg.wait()
+        return None
+    if not raw:
+        return None
+    import numpy as np
+    samples = np.frombuffer(raw, dtype=np.int16)
+    if samples.size < _ANALYSIS_WIN * 2:
+        return None
+    return samples[: _ANALYSIS_MAX_SECONDS * _ANALYSIS_RATE]
+
+
+def _analyse_samples(samples):
+    """FFT one track into (normalised band energies, band-limited waveform).
+
+    CPU-bound, so callers run it off the event loop.
+    """
+    import numpy as np
+
+    window = np.hanning(_ANALYSIS_WIN).astype(np.float32)
+    freqs = np.fft.rfftfreq(_ANALYSIS_WIN, 1.0 / _ANALYSIS_RATE)
+    edges = np.geomspace(40.0, _ANALYSIS_RATE / 2.0, VIS_BANDS + 1)
+    band_of = np.clip(np.searchsorted(edges, freqs) - 1, 0, VIS_BANDS - 1)
+    band_matrix = np.zeros((freqs.size, VIS_BANDS), dtype=np.float32)
+    for band in range(VIS_BANDS):
+        mask = band_of == band
+        count = int(mask.sum())
+        if count:
+            band_matrix[mask, band] = 1.0 / count
+
+    frames = max(1, (samples.size - _ANALYSIS_WIN) // _ANALYSIS_HOP + 1)
+    audio = samples.astype(np.float32)
+    bands = np.empty((frames, VIS_BANDS), dtype=np.float32)
+    offsets = np.arange(_ANALYSIS_WIN)
+    for start in range(0, frames, 2048):          # chunked to bound memory
+        stop = min(frames, start + 2048)
+        index = (np.arange(start, stop) * _ANALYSIS_HOP)[:, None] + offsets
+        spectrum = np.abs(np.fft.rfft(audio[index] * window, axis=1))
+        bands[start:stop] = spectrum @ band_matrix
+    # dB, then normalise against the loud end of this track so quiet tracks still
+    # fill the bars instead of showing a flat line.
+    db = 20.0 * np.log10(bands + 1e-6)
+    ref = float(np.percentile(db, 99))
+    floor = ref - 45.0
+    bands = np.clip((db - floor) / max(1e-6, ref - floor), 0.0, 1.0).astype(np.float32)
+
+    # Band-limited copy for the oscilloscope: windowed-sinc low-pass, then
+    # decimate. Rolled off at 300 Hz so the wave follows bass/melody rather than
+    # dissolving into a comb of cymbals and vocals.
+    taps = 101
+    n = np.arange(taps) - (taps - 1) / 2
+    lowpass = np.sinc(2.0 * _ANALYSIS_WAVE_CUTOFF / _ANALYSIS_RATE * n) * np.hamming(taps)
+    lowpass /= lowpass.sum()
+    wave = np.convolve(audio, lowpass, mode="same")
+    wave = wave[:: _ANALYSIS_RATE // _ANALYSIS_WAVE_RATE]
+    wave = np.clip(wave, -32768.0, 32767.0).astype(np.int16)
+    return _Analysis(bands, wave, _ANALYSIS_RATE, _ANALYSIS_HOP, _ANALYSIS_WAVE_RATE)
+
+
+async def _analyse_track(track):
+    """Return a cached _Analysis for this track, decoding it on first use."""
+    key = _track_key(track)
+    if not key:
+        return None
+    cached = _ANALYSIS_CACHE.get(key)
+    if cached is not None:
+        return cached
+    try:
+        import numpy  # noqa: F401
+    except ImportError:
+        log.warning("numpy is not installed; the visualiser needs it")
+        return None
+    url = _audio_url(track)
+    if not url:
+        return None
+    async with _ANALYSIS_SEM:
+        cached = _ANALYSIS_CACHE.get(key)
+        if cached is not None:
+            return cached
+        try:
+            samples = await _decode_audio(url)
+            if samples is None:
+                return None
+            analysis = await asyncio.to_thread(_analyse_samples, samples)
+        except Exception:
+            log.exception("could not analyse %r for the visualiser", key)
+            return None
+        if analysis is None:
+            return None
+        while len(_ANALYSIS_CACHE) >= _ANALYSIS_CACHE_MAX:
+            _ANALYSIS_CACHE.pop(next(iter(_ANALYSIS_CACHE)))
+        _ANALYSIS_CACHE[key] = analysis
+        return analysis
+
+
+async def _analyse_for_handle(guild_id, handle, track):
+    """Decode a track in the background and hand its analysis to the handle."""
+    try:
+        analysis = await _analyse_track(track)
+    except asyncio.CancelledError:
+        raise
+    except Exception:
+        log.exception("visualiser analysis failed")
+        analysis = None
+    if _VISUALIZERS.get(guild_id) is not handle:
+        return  # the panel was stopped or replaced while we were decoding
+    if analysis is None:
+        handle.analysis_failed = True
+    else:
+        handle.analysis = analysis
+
+
+def _render_spectrum(analysis, position_ms):
+    """The panel: 2 rows of real FFT bands over a 5-row oscilloscope."""
+    bands = analysis.bands
+    frame = int(position_ms / 1000.0 * analysis.rate / analysis.hop)
+    frame = max(0, min(bands.shape[0] - 1, frame))
+    values = bands[frame]
+    width = values.shape[0]
+
+    rows = [[" "] * width for _ in range(2)]
+    for col in range(width):
+        level = float(values[col]) * 16.0
+        if level >= 8.0:
+            rows[1][col] = "█"
+        elif level >= 1.0:
+            rows[1][col] = _VIS_RAMP[min(7, int(level) - 1)]
+        upper = level - 8.0
+        if upper >= 8.0:
+            rows[0][col] = "█"
+        elif upper >= 1.0:
+            rows[0][col] = _VIS_RAMP[min(7, int(upper) - 1)]
+    lines = ["".join(rows[0]), "".join(rows[1])]
+
+    wave = analysis.wave
+    start = int(position_ms / 1000.0 * analysis.wave_rate)
+    step = max(1, int(analysis.wave_rate * 0.05 / width))
+    columns = []
+    for col in range(width):
+        index = start + col * step
+        if index >= wave.size:
+            break
+        columns.append(float(wave[index:index + step].mean()) / 32768.0)
+    wave_rows = [[" "] * width for _ in range(5)]
+    if columns:
+        # Per-window auto-gain: quiet passages still show a wave, but true
+        # silence stays a flat line instead of an amplified noise floor.
+        peak = max(abs(value) for value in columns)
+        scale = peak if peak > 1e-3 else 1.0
+        previous = None
+        for col, value in enumerate(columns):
+            row = max(0, min(4, int((1.0 - value / scale) * 0.5 * 4.999)))
+            wave_rows[row][col] = "~"
+            if previous is not None:
+                for between in range(min(previous, row) + 1, max(previous, row)):
+                    wave_rows[between][col] = "~"
+            previous = row
+    lines += ["".join(row) for row in wave_rows]
+    return lines
+
+
+def _placeholder_lines(text, spin=""):
+    """A fixed-height stand-in while a track is being analysed (or cannot be)."""
+    lines = [" " * VIS_BANDS for _ in range(VIS_PANEL_ROWS)]
+    label = f"{spin} {text}".strip()
+    lines[VIS_PANEL_ROWS // 2] = label[:VIS_BANDS]
+    return lines
+
+
+_VIS_TITLE = "🎵 Music Visualiser"
+_SILENCE = "_Silence — nothing is playing._"
+
+
+def _start_analysis(guild_id, handle, track):
+    """Point the handle at a new track and decode it in the background."""
+    handle.track_key = _track_key(track)
+    handle.analysis = None
+    handle.analysis_failed = False
+    if handle.analysis_task is not None:
+        handle.analysis_task.cancel()
+    handle.analysis_task = bot.loop.create_task(
+        _analyse_for_handle(guild_id, handle, track)
+    )
+
+
+def _visualizer_body(handle, player):
+    track = player.current
+    state = player.state
+    total = int((getattr(track, "length", 0) or 0) / 1000)
+    position = handle.last_position
+    current = max(0, min(total, int(position / 1000)))
+    width = 16
+    filled = 0 if not total else int(width * current / total)
+    progress = "=" * filled
+    if filled < width:
+        progress += ">" + "-" * (width - filled - 1)
+    loop = "track" if state.loop_track else ("queue" if state.loop_queue else "off")
+
+    if handle.analysis is not None:
+        scene = "\n".join(_render_spectrum(handle.analysis, position))
+    elif handle.analysis_failed:
+        scene = "\n".join(_placeholder_lines("no readable audio for this track"))
+    else:
+        scene = "\n".join(
+            _placeholder_lines("analysing the audio", _SPINNER[handle.spinner % 4])
+        )
+
+    return (
+        f"**{track.title}**\n{getattr(track, 'author', '') or ''}\n\n"
+        f"```\n{scene}\n```\n"
+        f"`[{progress}]` `{_vis_time(current)} / {_vis_time(total)}`\n"
+        f"loop `{loop}` • queue `{state.queue.count}` • vol `{state.volume}%`"
+        + (" • ⏸ paused" if player.paused else "")
+    )
+
+
+def _visualizer_embed(body):
+    return nextcord.Embed(title=_VIS_TITLE, description=body, color=embed_color)
+
+
+def _visualizer_tick(handle, player):
+    """Return the frame body to render, or None to leave the panel untouched.
+
+    While playing the frame follows the live position; while paused the position
+    is left frozen and, after one 'paused' frame, the panel is not touched at all
+    until playback resumes.
+    """
+    if player.paused:
+        if handle.paused:
+            return None
+        handle.paused = True
+    else:
+        handle.paused = False
+        handle.last_position = float(player.position or 0)
+    return _visualizer_body(handle, player)
+
+
+async def _edit_visualizer(guild_id, embed):
+    """Edit the live panel, returning False the moment it can no longer be edited."""
+    handle = _VISUALIZERS.get(guild_id)
+    if handle is None or handle.message is None:
+        return False
+    try:
+        await handle.message.edit(embed=embed)
+        return True
+    except nextcord.NotFound:
+        return False  # a moderator or cleanup deleted the message
+    except nextcord.HTTPException as exc:
+        if getattr(exc, "status", None) == 429:
+            # nextcord normally absorbs 429s by sleeping; if one still surfaces,
+            # keep the panel alive rather than tearing it down on a throttle.
+            log.debug("visualiser edit throttled (guild %s)", guild_id)
+            return True
+        log.warning("visualiser update failed (guild %s): %r", guild_id, exc)
+        return False
+    except nextcord.DiscordException as exc:
+        log.warning("visualiser update failed (guild %s): %r", guild_id, exc)
+        return False
+
+
+async def _visualizer_loop(guild_id):
+    """Re-render the panel on a fixed cadence until playback stops.
+
+    The wait is measured against a monotonic schedule instead of sleeping a flat
+    interval each pass. Sleeping the interval and THEN rendering means the edit
+    time adds to every period, so the loop drifts to ~1.5-2s and the on-screen
+    timer appears to skip a second; scheduling `next = previous + interval`
+    keeps the redraws exactly one second apart.
+    """
+    try:
+        schedule = bot.loop.time()
+        while True:
+            schedule += VISUALIZER_INTERVAL
+            delay = schedule - bot.loop.time()
+            if delay > 0:
+                await asyncio.sleep(delay)
+            elif delay < -VISUALIZER_INTERVAL:
+                # Fell a whole interval behind (a blocked/throttled edit): resync
+                # instead of firing a burst of catch-up frames at the channel.
+                schedule = bot.loop.time()
+            handle = _VISUALIZERS.get(guild_id)
+            if handle is None:
+                return
+            guild = bot.get_guild(guild_id)
+            player = guild.voice_client if guild is not None else None
+            if player is None or player.current is None:
+                # Idle: say so once, but KEEP the subscription alive so the next
+                # track lights the panel back up without /visualizer again.
+                if handle.message is not None and handle.last_text != _SILENCE:
+                    if await _edit_visualizer(guild_id, _visualizer_embed(_SILENCE)):
+                        handle.last_text = _SILENCE
+                    else:
+                        handle.message = None
+                continue
+
+            if handle.message is None or handle.last_text == _SILENCE:
+                # Music is back but the panel is gone or still the idle frame:
+                # move it to the bottom by dropping the old message and posting
+                # a fresh one, so the live panel is the newest message again.
+                channel = bot.get_channel(handle.channel_id)
+                if channel is None:
+                    return
+                if handle.message is not None:
+                    try:
+                        await handle.message.delete()
+                    except nextcord.DiscordException:
+                        pass
+                    handle.message = None
+                _start_analysis(guild_id, handle, player.current)
+                handle.last_position = float(player.position or 0)
+                handle.paused = bool(player.paused)
+                posted = _visualizer_body(handle, player)
+                try:
+                    handle.message = await channel.send(embed=_visualizer_embed(posted))
+                except nextcord.DiscordException as exc:
+                    log.warning("could not repost the visualiser: %r", exc)
+                    handle.message = None
+                    return
+                handle.last_text = posted
+                continue
+
+            key = _track_key(player.current)
+            if key != handle.track_key:
+                _start_analysis(guild_id, handle, player.current)
+            if handle.analysis is None and not handle.analysis_failed:
+                handle.spinner += 1
+            body = _visualizer_tick(handle, player)
+            if body is None or body == handle.last_text:
+                continue  # paused, or nothing changed: leave the frame alone
+            handle.last_text = body
+            if not await _edit_visualizer(guild_id, _visualizer_embed(body)):
+                return
+    except asyncio.CancelledError:
+        raise
+    except Exception:
+        log.exception("visualiser loop died (guild %s)", guild_id)
+    finally:
+        # Identity-guarded: a restart installs the new task's handle before this
+        # task's finally runs, and a bare pop would delete the NEW handle.
+        handle = _VISUALIZERS.get(guild_id)
+        if handle is not None and handle.task is asyncio.current_task():
+            _VISUALIZERS.pop(guild_id, None)
+        if handle is not None and handle.analysis_task is not None:
+            handle.analysis_task.cancel()
+
+
+async def _stop_visualizer(guild_id, *, final_embed=None, delete=False):
+    """Cancel a running visualiser and tidy its panel.
+
+    delete=True removes the panel entirely -- used when the bot leaves the voice
+    channel, where a leftover panel is just a stale message. Otherwise a
+    final_embed replaces it with a closing frame.
+    """
+    handle = _VISUALIZERS.pop(guild_id, None)
+    if handle is None:
+        return False
+    if handle.task is not None:
+        handle.task.cancel()
+    if handle.analysis_task is not None:
+        handle.analysis_task.cancel()
+    if handle.message is not None:
+        try:
+            if delete:
+                await handle.message.delete()
+            elif final_embed is not None:
+                await handle.message.edit(embed=final_embed)
+        except nextcord.DiscordException:
+            pass
+    return True
+
+
+@rate_limit(1, 2)
+@bot.slash_command(
+    name="visualizer",
+    description="real-audio music visualiser (spectrum + waveform)",
+    dm_permission=False,
+)
+async def visualizer_command(interaction: interactions.Interaction, mode: str = nextcord.SlashOption(
+    name="mode", description="start or stop the visualiser", required=True, choices=["start", "stop"]
+)):
+    if await user_connectivity(interaction) == False:
+        return
+    guild_id = interaction.guild.id
+
+    if mode == "stop":
+        stopped = await _stop_visualizer(guild_id, final_embed=nextcord.Embed(
+            title="🎵 Music Visualiser", description="_Stopped._", color=embed_color))
+        return await interaction.response.send_message(
+            embed=nextcord.Embed(
+                description="Visualiser `stopped`." if stopped else "No visualiser is running.",
+                color=embed_color,
+            ),
+            ephemeral=True,
+        )
+
+    player = interaction.guild.voice_client
+    if player.current is None:
+        return await interaction.response.send_message(
+            embed=nextcord.Embed(
+                description="Nothing is playing to visualise.", color=embed_color
+            ),
+            ephemeral=True,
+        )
+
+    # Re-running start replaces the panel cleanly, so there is never more than
+    # one live panel (and one render task) per guild.
+    await _stop_visualizer(guild_id, delete=True)
+    await interaction.response.defer()
+    track = player.current
+    handle = _Visualizer()
+    handle.track_key = _track_key(track)
+    handle.last_position = max(0.0, float(player.position or 0))
+    handle.paused = bool(player.paused)
+    body = _visualizer_body(handle, player)
+    try:
+        message = await interaction.channel.send(embed=_visualizer_embed(body))
+    except nextcord.DiscordException as exc:
+        log.warning("could not post the visualiser: %r", exc)
+        return await interaction.followup.send(
+            "I can't post here — I need **Send Messages** and **Embed Links** "
+            "in this channel.",
+            ephemeral=True,
+        )
+    handle.message = message
+    handle.channel_id = message.channel.id
+    handle.last_text = body
+    _VISUALIZERS[guild_id] = handle
+    handle.task = bot.loop.create_task(_visualizer_loop(guild_id))
+    handle.analysis_task = bot.loop.create_task(
+        _analyse_for_handle(guild_id, handle, track)
+    )
+    return await interaction.followup.send(
+        f"Visualiser `started` — decoding the audio for a real waveform; it "
+        f"redraws every {VISUALIZER_INTERVAL:g}s (Discord caps message edits at "
+        f"about one per second). `/visualizer stop` to end it.",
+        ephemeral=True,
+    )
+
+
 @rate_limit(1, 2)
 @require_role("tm")
 @bot.slash_command(name="skip", description="skips to the next track", dm_permission=False)
@@ -1765,6 +2364,7 @@ async def disconnect_command(interaction: interactions.Interaction):
     state.queue.clear()
     state.loop_queue = False
     state.abandoned_id = None
+    await _stop_visualizer(interaction.guild.id, delete=True)
     try:
         await vc.disconnect(force=True)
     except Exception as exc:
@@ -1809,6 +2409,7 @@ async def on_voice_state_update(member, before, after):
             vc.state.loop_queue = False
             vc.state.loop_track = False
             vc.state.abandoned_id = None
+            await _stop_visualizer(vc.guild.id, delete=True)
             await vc.disconnect(force=True)
             log.info("auto-disconnected from channel %s (nobody left / kicked)",
                      getattr(channel, "id", "?"))
@@ -2549,6 +3150,10 @@ async def _graceful_shutdown():
             await node.cleanup()
         except Exception as exc:
             log.warning("could not close a node on shutdown: %r", exc)
+    for handle in list(_VISUALIZERS.values()):
+        if handle.task is not None:
+            handle.task.cancel()
+    _VISUALIZERS.clear()
     if _node_connect_task is not None:
         _node_connect_task.cancel()
     try:
